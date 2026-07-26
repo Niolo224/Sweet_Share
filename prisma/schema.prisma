@@ -1,0 +1,298 @@
+// Sweet Share — data model
+//
+// SQLite is used by default so the shop runs the moment you clone it.
+// To move to Postgres (Neon / Supabase) change `provider` to "postgresql";
+// every model below is portable as-is.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// A single dessert in the collection.
+model Dessert {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  tagline     String
+  description String
+  /// The longer "placard" text shown in the gallery exhibit view.
+  story       String?
+
+  /// Which room of the gallery this belongs to: cakes, tarts, cookies,
+  /// puddings, breads, seasonal.
+  category    String  @default("cakes")
+
+  priceCents  Int
+  /// Optional "from" pricing for items sold by the box or tray.
+  unitLabel   String  @default("each")
+
+  imageUrl    String?
+  imageAlt    String?
+
+  /// JSON array of { name, note } — every ingredient, named plainly.
+  ingredients String  @default("[]")
+  /// JSON array of strings — nuts, soy, gluten, coconut, sesame.
+  allergens   String  @default("[]")
+  /// JSON array of strings — vegan, gluten-free, no-refined-sugar, keto-friendly.
+  badges      String  @default("[]")
+
+  // ── Nutrition, per serving ────────────────────────────────
+  servingSize   String?
+  calories      Int?
+  totalCarbsG   Float?
+  fiberG        Float?
+  sugarsG       Float?
+  addedSugarsG  Float?  @default(0)
+  sugarAlcoholG Float?  @default(0)
+  proteinG      Float?
+  fatG          Float?
+  satFatG       Float?
+  sodiumMg      Float?
+
+  /// How we sweeten it: dates, monk fruit, allulose, maple, banana.
+  sweetener     String?
+  /// Estimated glycemic load per serving, and the plain-English note.
+  glycemicLoad  Float?
+  glycemicNote  String?
+
+  /// Days of notice needed before pickup or delivery.
+  leadTimeDays  Int     @default(2)
+  servesText    String?
+
+  /// A verse or blessing that belongs to this dessert.
+  scripture     String?
+  scriptureRef  String?
+
+  isFeatured  Boolean @default(false)
+  isAvailable Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reviews    Review[]
+  menuItems  MenuItem[]
+  orderItems OrderItem[]
+
+  @@index([category])
+  @@index([isFeatured])
+}
+
+/// A seasonal or occasion menu — the thing you publish and re-publish.
+model Menu {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  title         String
+  subtitle      String?
+  description   String?
+  /// Spring, Summer, Harvest, Advent, Lent, Everyday.
+  season        String?
+  coverImageUrl String?
+  /// Optional uploaded PDF of the printed menu.
+  pdfUrl        String?
+  isActive      Boolean  @default(false)
+  publishedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items MenuItem[]
+}
+
+model MenuItem {
+  id        String  @id @default(cuid())
+  menuId    String
+  dessertId String
+  /// An optional curator's note for this dessert on this menu.
+  note      String?
+  sortOrder Int     @default(0)
+
+  menu    Menu    @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  dessert Dessert @relation(fields: [dessertId], references: [id], onDelete: Cascade)
+
+  @@unique([menuId, dessertId])
+  @@index([menuId])
+}
+
+/// Tastings, markets, bake-alongs, church gatherings.
+model Event {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  description String
+  startsAt    DateTime
+  endsAt      DateTime?
+  location    String
+  address     String?
+  imageUrl    String?
+  /// External ticketing or RSVP link, if you use one.
+  ticketUrl   String?
+  capacity    Int?
+  priceCents  Int?     @default(0)
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rsvps EventRsvp[]
+
+  @@index([startsAt])
+}
+
+model EventRsvp {
+  id        String   @id @default(cuid())
+  eventId   String
+  name      String
+  email     String
+  guests    Int      @default(1)
+  note      String?
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, email])
+  @@index([eventId])
+}
+
+/// The email list.
+model Subscriber {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String?
+  /// Where they joined from: footer, popup, checkout, event, testimonial.
+  source         String    @default("footer")
+  /// Explicit opt-in, recorded for CAN-SPAM / GDPR.
+  consent        Boolean   @default(true)
+  unsubscribedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([createdAt])
+}
+
+/// Testimonials. Public submissions land as `pending` until you approve.
+model Review {
+  id        String  @id @default(cuid())
+  dessertId String?
+  name      String
+  email     String?
+  location  String?
+  rating    Int
+  title     String?
+  body      String
+  imageUrl  String?
+  /// pending | approved | rejected
+  status    String  @default("pending")
+  isFeatured Boolean @default(false)
+  /// Set when the reviewer's order can be matched — powers "Verified guest".
+  isVerified Boolean @default(false)
+  reply      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dessert Dessert? @relation(fields: [dessertId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([dessertId])
+}
+
+/// An advance order.
+model Order {
+  id          String @id @default(cuid())
+  orderNumber String @unique
+
+  customerName String
+  email        String
+  phone        String?
+
+  /// pickup | delivery | shipping
+  fulfillment   String   @default("pickup")
+  requestedDate DateTime
+  timeWindow    String?
+  address       String?
+  city          String?
+  postalCode    String?
+
+  occasion String?
+  notes    String?
+  /// Free-text allergy and dietary notes from the guest.
+  dietaryNotes String?
+
+  subtotalCents    Int
+  deliveryFeeCents Int @default(0)
+  totalCents       Int
+
+  /// pending | confirmed | baking | ready | fulfilled | cancelled
+  status        String @default("pending")
+  /// unpaid | paid | refunded
+  paymentStatus String @default("unpaid")
+  stripeSessionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items OrderItem[]
+
+  @@index([status])
+  @@index([requestedDate])
+}
+
+model OrderItem {
+  id             String  @id @default(cuid())
+  orderId        String
+  dessertId      String?
+  /// Name and price are snapshotted so historic orders never change.
+  nameSnapshot   String
+  unitPriceCents Int
+  quantity       Int     @default(1)
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dessert Dessert? @relation(fields: [dessertId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+}
+
+/// The pantry glossary — every ingredient we use, explained.
+model Ingredient {
+  id        String @id @default(cuid())
+  slug      String @unique
+  name      String
+  /// sweetener | flour | fat | fruit | nut | spice | binder
+  kind      String @default("sweetener")
+  summary   String
+  /// Why it earns its place — the health note.
+  benefits  String?
+  /// Glycemic index where it is meaningful (0-110), null where it is not.
+  glycemicIndex Int?
+  imageUrl  String?
+  sortOrder Int    @default(0)
+
+  @@index([kind])
+}
+
+/// Catering, wholesale and general enquiries.
+model Message {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  /// general | catering | wholesale | press | prayer
+  topic     String   @default("general")
+  subject   String?
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([isRead])
+}
+
+/// Editable site copy — hero lines, mission, announcement bar.
+/// Keeps the owner out of the codebase.
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

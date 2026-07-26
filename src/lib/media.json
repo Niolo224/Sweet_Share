@@ -1,0 +1,65 @@
+{
+  "cdn": "https://d8j0ntlcm91z4.cloudfront.net/user_31yDvSjvD7UCeXfd3mzXyGwrNtp",
+  "assets": {
+    "hero": {
+      "file": "hero-dessert-heaven.png",
+      "remote": "hf_20260726_150005_efa47429-8a3e-4733-a978-177cb09c51be.png",
+      "alt": "A gallery of desserts on cloud pedestals in a pink and gold heaven"
+    },
+    "chocolateDateTorte": {
+      "file": "chocolate-date-torte.png",
+      "remote": "hf_20260726_145609_5f19595b-dc0a-4062-82cf-77b38f20db84.png",
+      "alt": "A slice of dark chocolate and date torte floating in pink clouds"
+    },
+    "lemonOliveOilCake": {
+      "file": "lemon-olive-oil-cake.png",
+      "remote": "hf_20260726_150009_f974da3f-c464-4f06-a0ca-5740232fde32.png",
+      "alt": "A golden lemon olive oil cake with blueberries floating in pink clouds"
+    },
+    "pistachioRoseTart": {
+      "file": "pistachio-rose-tart.png",
+      "remote": "hf_20260726_145615_205ff206-1f4f-4d36-8640-01db8456c163.png",
+      "alt": "A pistachio, rose and cardamom tart floating in pink clouds"
+    },
+    "chocolateAvocadoMousse": {
+      "file": "chocolate-avocado-mousse.png",
+      "remote": "hf_20260726_145618_4119dc26-dd00-4f3a-a8c5-38a6e6e51005.png",
+      "alt": "Three jars of chocolate avocado mousse with raspberries floating in pink clouds"
+    },
+    "cinnamonAppleHandPies": {
+      "file": "cinnamon-apple-hand-pies.png",
+      "remote": "hf_20260726_145621_604593d8-5158-4d35-8a82-ad1252f78843.png",
+      "alt": "Lattice-topped cinnamon apple hand pies floating in pink clouds"
+    },
+    "chocolateChipCookies": {
+      "file": "chocolate-chip-cookies.png",
+      "remote": "hf_20260726_145625_288dd3d8-85c4-4aa4-999d-dac752dca829.png",
+      "alt": "A golden chocolate chip cookie floating in pink heart-shaped clouds"
+    },
+    "bananaWalnutBread": {
+      "file": "banana-walnut-bread.png",
+      "remote": "hf_20260726_145822_a221fc7f-f61d-4c5e-aa13-b824c41fa6d6.png",
+      "alt": "A loaf of banana walnut bread floating in pink clouds"
+    },
+    "giftBox": {
+      "file": "share-box.png",
+      "remote": "hf_20260726_145629_dc532ebb-8583-4507-a674-3c04f176de0c.png",
+      "alt": "An open gift box of petit fours tied with pink ribbon, floating in clouds"
+    },
+    "gathering": {
+      "file": "gathering-table.png",
+      "remote": "hf_20260726_145631_cee8bdcd-62db-4f11-b41a-c962a7de5b7f.png",
+      "alt": "A long banquet table set for a gathering, resting on pink clouds"
+    },
+    "pantry": {
+      "file": "pantry-ingredients.png",
+      "remote": "hf_20260726_145825_ec016373-0b0d-4d88-bf79-d939e73027d3.png",
+      "alt": "Jars of dates, almond flour, cacao and spices resting on pink clouds"
+    },
+    "sharing": {
+      "file": "hands-sharing.png",
+      "remote": "hf_20260726_145829_0531f7b7-8402-4b84-9a75-af86dc9dca86.png",
+      "alt": "Two open hands offering a ribboned dessert box up into the light"
+    }
+  }
+}
