@@ -9,6 +9,12 @@ import { setSetting } from "@/lib/settings";
 import { slugify, formatMoney, formatDate } from "@/lib/utils";
 import { getStripe, ACH_THRESHOLD_CENTS, siteUrl } from "@/lib/stripe";
 import { sendEmail, emailShell } from "@/lib/email";
+import {
+  refundToCard,
+  generateCode,
+  MIN_GIFT_CENTS,
+  MAX_GIFT_CENTS,
+} from "@/lib/giftcards";
 
 export type ActionState = { error?: string; success?: string } | null;
 
@@ -433,7 +439,12 @@ export async function setOrderStatusAction(form: FormData) {
   if (!allowed.includes(status)) return;
 
   await prisma.order.update({ where: { id }, data: { status } });
+
+  // Cancelling an order hands any gift card value back to the guest.
+  if (status === "cancelled") await refundToCard(id);
+
   revalidatePath("/admin/orders");
+  revalidatePath("/admin/gift-cards");
 }
 
 export async function setPaymentStatusAction(form: FormData) {
@@ -608,6 +619,133 @@ export async function removeSubscriberAction(form: FormData) {
     data: { unsubscribedAt: new Date() },
   });
   revalidatePath("/admin/subscribers");
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Gift cards
+// ═══════════════════════════════════════════════════════════
+
+/** Issue a card by hand — an apology, a prize, a gift to a family. */
+export async function issueGiftCardAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const amount = num(form, "amount");
+  if (amount == null || amount <= 0) {
+    return { error: "How much should the card be worth?" };
+  }
+
+  const cents = Math.round(amount * 100);
+  if (cents < MIN_GIFT_CENTS || cents > MAX_GIFT_CENTS) {
+    return {
+      error: `Comped cards must be between ${formatMoney(MIN_GIFT_CENTS)} and ${formatMoney(MAX_GIFT_CENTS)}.`,
+    };
+  }
+
+  const recipientEmail = text(form, "recipientEmail");
+  const recipientName = text(form, "recipientName");
+  const message = text(form, "message");
+
+  try {
+    const card = await prisma.giftCard.create({
+      data: {
+        code: await generateCode(),
+        initialCents: cents,
+        balanceCents: cents,
+        recipientName,
+        recipientEmail,
+        message,
+        // Comped cards skip the pending state — there is no payment to wait on.
+        status: "active",
+        activatedAt: new Date(),
+        isComped: true,
+      },
+    });
+
+    if (recipientEmail) {
+      await sendEmail({
+        to: recipientEmail,
+        subject: "A gift from Sweet Share",
+        html: emailShell(
+          recipientName ? `For you, ${recipientName}` : "A gift for you",
+          `${message ? `<p style="font-style:italic;">“${message}”</p>` : ""}
+           <p style="margin:24px 0;padding:20px;border:1px dashed #f9c4d4;border-radius:14px;text-align:center;">
+             <span style="display:block;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:#ee6f94;">Your code</span>
+             <strong style="display:block;margin-top:8px;font-size:24px;letter-spacing:.12em;color:#45213a;">${card.code}</strong>
+             <span style="display:block;margin-top:8px;font-size:14px;color:#6d3f5c;">${formatMoney(cents)}</span>
+           </p>
+           <p>Enter it at checkout on any order. It never expires, and anything
+           you do not spend stays on the card.</p>`,
+        ),
+      });
+    }
+  } catch (error) {
+    console.error("[admin/issueGiftCard]", error);
+    return { error: "Could not issue that card." };
+  }
+
+  revalidatePath("/admin/gift-cards");
+  return { success: "Card issued." };
+}
+
+export async function voidGiftCardAction(form: FormData) {
+  await requireAdmin();
+  const id = text(form, "id");
+  if (!id) return;
+  await prisma.giftCard.update({
+    where: { id },
+    data: { status: "void" },
+  });
+  revalidatePath("/admin/gift-cards");
+}
+
+export async function restoreGiftCardAction(form: FormData) {
+  await requireAdmin();
+  const id = text(form, "id");
+  if (!id) return;
+  const card = await prisma.giftCard.findUnique({ where: { id } });
+  if (!card) return;
+  await prisma.giftCard.update({
+    where: { id },
+    data: { status: card.balanceCents > 0 ? "active" : "spent" },
+  });
+  revalidatePath("/admin/gift-cards");
+}
+
+// ═══════════════════════════════════════════════════════════
+//  The club
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Cancel a membership. Stripe is the source of truth for billing, so we tell
+ * it first and let the webhook write our record — that way the two can never
+ * disagree about whether someone is still being charged.
+ */
+export async function cancelSubscriptionAction(form: FormData) {
+  await requireAdmin();
+  const id = text(form, "id");
+  if (!id) return;
+
+  const subscription = await prisma.subscription.findUnique({ where: { id } });
+  if (!subscription) return;
+
+  const stripe = getStripe();
+  if (stripe && subscription.stripeSubscriptionId) {
+    try {
+      await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+    } catch (error) {
+      console.error("[admin/cancelSubscription]", error);
+    }
+  }
+
+  await prisma.subscription.update({
+    where: { id },
+    data: { status: "cancelled", cancelledAt: new Date() },
+  });
+
+  revalidatePath("/admin/club");
 }
 
 export async function saveSettingsAction(

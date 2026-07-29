@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, clientKey } from "@/lib/rate-limit";
 import { sendEmail, emailShell } from "@/lib/email";
+import { checkCard, redeem, reverseRedemption } from "@/lib/giftcards";
 import { formatMoney, formatDate, orderNumber } from "@/lib/utils";
 
 const DELIVERY_FEE_CENTS = 800;
@@ -21,6 +22,7 @@ const schema = z.object({
   occasion: z.string().max(120).optional().nullable(),
   notes: z.string().max(800).optional().nullable(),
   dietaryNotes: z.string().max(800).optional().nullable(),
+  giftCardCode: z.string().max(40).optional().nullable(),
   joinList: z.boolean().optional(),
   items: z
     .array(
@@ -149,12 +151,45 @@ export async function POST(request: Request) {
       data.fulfillment === "delivery" && subtotalCents < FREE_DELIVERY_OVER_CENTS
         ? DELIVERY_FEE_CENTS
         : 0;
-    const totalCents = subtotalCents + deliveryFeeCents;
+    const grossCents = subtotalCents + deliveryFeeCents;
 
     const email = data.email.trim().toLowerCase();
     const number = orderNumber();
 
-    const order = await prisma.order.create({
+    /**
+     * A gift card is money, so it is spent before the order is written — the
+     * redemption is atomic and cannot overdraw the card. If writing the order
+     * then fails, the redemption is reversed so nobody loses their balance.
+     */
+    let giftCardCents = 0;
+    let giftCardCode: string | null = null;
+    let redemptionId: string | null = null;
+
+    if (data.giftCardCode?.trim()) {
+      const check = await checkCard(data.giftCardCode);
+      if (!check.ok) {
+        return NextResponse.json({ error: check.error }, { status: 400 });
+      }
+
+      const applied = await redeem(
+        check.code,
+        Math.min(check.balanceCents, grossCents),
+        { orderNumber: number },
+      );
+      if (!applied.ok) {
+        return NextResponse.json({ error: applied.error }, { status: 409 });
+      }
+
+      giftCardCents = applied.appliedCents;
+      giftCardCode = check.code;
+      redemptionId = applied.redemptionId;
+    }
+
+    const totalCents = grossCents - giftCardCents;
+
+    let order;
+    try {
+      order = await prisma.order.create({
       data: {
         orderNumber: number,
         customerName: data.customerName.trim(),
@@ -171,9 +206,12 @@ export async function POST(request: Request) {
         dietaryNotes: data.dietaryNotes?.trim() || null,
         subtotalCents,
         deliveryFeeCents,
+        giftCardCents,
+        giftCardCode,
         totalCents,
         status: "pending",
-        paymentStatus: "unpaid",
+        // A card that covers the whole order leaves nothing to charge.
+        paymentStatus: totalCents === 0 ? "paid" : "unpaid",
         items: {
           create: lines.map((line) => ({
             dessertId: line.dessertId,
@@ -183,7 +221,19 @@ export async function POST(request: Request) {
           })),
         },
       },
-    });
+      });
+    } catch (error) {
+      if (redemptionId) await reverseRedemption(redemptionId);
+      throw error;
+    }
+
+    // Link the redemption to the order now that the order exists.
+    if (redemptionId) {
+      await prisma.giftCardRedemption.update({
+        where: { id: redemptionId },
+        data: { orderId: order.id },
+      });
+    }
 
     if (data.joinList) {
       await prisma.subscriber.upsert({
@@ -214,6 +264,11 @@ export async function POST(request: Request) {
         <tr><td>${data.fulfillment === "delivery" ? "Delivery" : "Collection"}</td><td style="text-align:right;">${
           deliveryFeeCents === 0 ? "Free" : formatMoney(deliveryFeeCents)
         }</td></tr>
+        ${
+          giftCardCents > 0
+            ? `<tr><td>Gift card ${giftCardCode}</td><td style="text-align:right;">−${formatMoney(giftCardCents)}</td></tr>`
+            : ""
+        }
         <tr><td style="padding-top:8px;font-weight:bold;">Total</td><td style="padding-top:8px;text-align:right;font-weight:bold;">${formatMoney(totalCents)}</td></tr>
       </table>`;
 
@@ -222,9 +277,11 @@ export async function POST(request: Request) {
       subject: `We have your order — ${number}`,
       html: emailShell(
         `Thank you, ${data.customerName.trim().split(" ")[0]}`,
-        `<p>Your advance order is with us. Nothing is charged yet — we will read
-         it over, confirm we can make it beautifully for your date, and then
-         send you a secure payment link.</p>
+        `<p>Your advance order is with us. ${
+           totalCents === 0
+             ? "Your gift card covers it in full, so there is nothing to pay."
+             : "Nothing is charged yet — we will read it over, confirm we can make it beautifully for your date, and then send you a secure payment link."
+         }</p>
          <p><strong>Order ${number}</strong><br/>
          ${data.fulfillment === "delivery" ? "Delivery" : "Collection"} on ${formatDate(requestedDate)}${
            data.timeWindow ? `, ${data.timeWindow}` : ""

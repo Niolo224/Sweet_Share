@@ -51,7 +51,9 @@ and the database is a local SQLite file.
 | `/story` | Story, mission, the four values, a note from the kitchen |
 | `/gatherings` | Upcoming events with live RSVP and seat counts |
 | `/testimonials` | All approved reviews, rating distribution, and a form to leave one |
-| `/order` | Advance-order basket with lead-time enforcement, pickup or delivery, allergy notes |
+| `/club` | The Sweet Share Club — three monthly box tiers, billed by Stripe |
+| `/gift-cards` | Buy a gift card, sent straight to the recipient with a note |
+| `/order` | Advance-order basket with lead-time enforcement, gift card redemption, pickup or delivery, allergy notes |
 | `/faq` | Questions and facts, including the honest ones about sugar |
 | `/contact` | Catering, wholesale, custom orders, prayer requests |
 
@@ -60,6 +62,10 @@ and the database is a local SQLite file.
 - **Overview** — open orders, revenue this month, what needs attention
 - **Orders** — every advance order, filterable, with status and payment
   tracking, one-click Stripe payment links, and CSV export
+- **Club** — members, monthly recurring revenue, which boxes need baking, and
+  one-click cancellation
+- **Gift cards** — every card, its balance and full movement history, your
+  unredeemed liability, plus issuing comped cards by hand
 - **Desserts** — add and edit desserts, upload photos, write ingredients and
   full nutrition, feature them, rest them for a season
 - **Menus** — build seasonal menus from your desserts, upload a printed PDF,

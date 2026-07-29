@@ -75,6 +75,13 @@ In production, add an endpoint in the Stripe dashboard pointing at
 - `checkout.session.async_payment_failed`
 - `checkout.session.expired`
 - `charge.refunded`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.paid`
+- `invoice.payment_failed`
+
+The last four are what keep the club running. Miss them and memberships will
+bill in Stripe while no boxes ever appear in your kitchen.
 
 Then copy that endpoint's signing secret into your production environment.
 
@@ -115,6 +122,48 @@ Test bank account for ACH: routing `110000000`, account `000123456789`.
 
 ---
 
+## Gift cards
+
+Bought at `/gift-cards`. Unlike a dessert order there is nothing to bake, so
+payment is taken **immediately** — the card is created `pending` and only
+becomes spendable once the webhook confirms the money.
+
+At checkout a guest enters the code and it comes off the total. If it does not
+cover the whole order, the rest is paid the normal way; if it covers everything,
+the order is marked paid with no payment link needed.
+
+Two details worth knowing:
+
+- **Cards cannot be double-spent.** Redemption happens inside a transaction
+  with a conditional balance check, so two orders racing on the same code split
+  the balance rather than both drawing it down. This is tested.
+- **Cancelling an order returns the value** to the card, exactly once, however
+  many times the order is re-cancelled.
+
+**Accounting:** money taken for a gift card is a *liability*, not income, until
+it is spent. The admin page shows your unredeemed balance — that is what you
+owe in dessert. Most US states also ban expiry dates and dormancy fees, and
+some require unclaimed balances to be handed to the state after some years.
+Worth ten minutes with an accountant before you sell many.
+
+## The club
+
+Members join at `/club`. Prices live in `src/lib/plans.ts` rather than the
+database, because changing a subscription price is not a content edit —
+existing members keep the price they joined at, held by Stripe. Editing that
+file changes what *new* members pay and touches nobody already subscribed.
+
+No Products or Prices need creating in the dashboard: Checkout is given an
+inline recurring price, so the club works the moment your keys are set.
+
+Each month `invoice.paid` raises an ordinary kitchen order — already confirmed
+and marked paid — so club boxes appear in your normal Orders list alongside
+everything else. The invoice id is stored uniquely against the order, so a
+replayed webhook can never raise the same box twice.
+
+To test: join at `/club` with `4242 4242 4242 4242`, then use
+`stripe trigger invoice.paid` to simulate the following month.
+
 ## Going live
 
 1. **Roll the test secret key** — it has been shared in plain text, so treat it
@@ -139,6 +188,12 @@ Verified locally, offline:
   order paid and auto-confirms it.
 - A bank debit that has completed the session but not yet settled is held at
   `processing` rather than being treated as paid.
+- Two orders placed **simultaneously** against one $50 gift card split it
+  $46/$4 — exactly $50 spent, never overdrawn.
+- Cancelling a gift-card order returns the value once; cancelling again does
+  not return it twice.
+- Gift card codes are matched after normalising, so `ss test test test`
+  resolves to `SS-TEST-TEST-TEST` and an unknown code is refused.
 
 Not verified: anything requiring Stripe's servers. `api.stripe.com` is blocked
 by the network policy on the machine this was built on, so **no Checkout

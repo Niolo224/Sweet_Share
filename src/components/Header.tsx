@@ -8,10 +8,11 @@ import { useCart } from "./CartProvider";
 
 const NAV = [
   { href: "/gallery", label: "The Gallery" },
+  { href: "/club", label: "The Club" },
   { href: "/pantry", label: "The Pantry" },
   { href: "/story", label: "Our Story" },
   { href: "/gatherings", label: "Gatherings" },
-  { href: "/testimonials", label: "Kind Words" },
+  { href: "/gift-cards", label: "Gift Cards" },
 ];
 
 export default function Header({ announcement }: { announcement: string }) {

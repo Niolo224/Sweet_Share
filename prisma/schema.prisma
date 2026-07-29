@@ -223,21 +223,118 @@ model Order {
 
   subtotalCents    Int
   deliveryFeeCents Int @default(0)
+  /// How much of the total a gift card covered.
+  giftCardCents    Int @default(0)
+  giftCardCode     String?
   totalCents       Int
+
+  /// Set when the kitchen order was raised automatically by a club renewal.
+  subscriptionId String?
 
   /// pending | confirmed | baking | ready | fulfilled | cancelled
   status        String @default("pending")
-  /// unpaid | paid | refunded
+  /// unpaid | processing | paid | refunded
   paymentStatus String @default("unpaid")
   stripeSessionId String?
+  /// Unique, so a replayed club invoice can never raise a second box.
+  stripeInvoiceId String? @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   items OrderItem[]
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([requestedDate])
+  @@index([subscriptionId])
+}
+
+/// A gift card someone bought, or that we comped.
+model GiftCard {
+  id   String @id @default(cuid())
+  /// Human-readable and unambiguous — no O/0 or I/1/L confusion.
+  code String @unique
+
+  initialCents Int
+  /// Decremented as it is spent. Partial redemption leaves the rest usable.
+  balanceCents Int
+
+  purchaserName  String?
+  purchaserEmail String?
+  recipientName  String?
+  recipientEmail String?
+  message        String?
+
+  /// pending | active | spent | void
+  status String @default("pending")
+  /// True when the kitchen issued it by hand rather than it being bought.
+  isComped Boolean @default(false)
+
+  stripeSessionId String?
+
+  createdAt   DateTime  @default(now())
+  activatedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  redemptions GiftCardRedemption[]
+
+  @@index([status])
+}
+
+/// Every time a card is spent, so a balance can always be explained.
+model GiftCardRedemption {
+  id          String   @id @default(cuid())
+  giftCardId  String
+  orderId     String?
+  orderNumber String?
+  amountCents Int
+  /// Set when an order is cancelled and the value handed back.
+  isReversal  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  giftCard GiftCard @relation(fields: [giftCardId], references: [id], onDelete: Cascade)
+
+  @@index([giftCardId])
+}
+
+/// A standing order — the Sweet Share Club.
+model Subscription {
+  id String @id @default(cuid())
+
+  stripeSubscriptionId String? @unique
+  stripeCustomerId     String?
+  stripeSessionId      String?
+
+  customerName String
+  email        String
+  phone        String?
+
+  /// Matches a key in src/lib/plans.ts
+  plan       String
+  priceCents Int
+
+  /// pickup | delivery
+  fulfillment  String  @default("pickup")
+  address      String?
+  city         String?
+  postalCode   String?
+  dietaryNotes String?
+
+  /// pending | active | past_due | paused | cancelled
+  status String @default("pending")
+
+  startedAt        DateTime?
+  currentPeriodEnd DateTime?
+  cancelledAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+
+  @@index([status])
+  @@index([email])
 }
 
 model OrderItem {

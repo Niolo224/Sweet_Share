@@ -7,6 +7,7 @@ const COLUMNS = [
     heading: "Visit",
     links: [
       { href: "/gallery", label: "The Gallery" },
+      { href: "/club", label: "The Club" },
       { href: "/pantry", label: "The Pantry" },
       { href: "/gatherings", label: "Gatherings" },
       { href: "/order", label: "Order ahead" },
@@ -16,6 +17,7 @@ const COLUMNS = [
     heading: "Know us",
     links: [
       { href: "/story", label: "Our story" },
+      { href: "/gift-cards", label: "Gift cards" },
       { href: "/testimonials", label: "Kind words" },
       { href: "/faq", label: "Questions & facts" },
       { href: "/contact", label: "Contact & catering" },

@@ -26,13 +26,51 @@ export default function OrderFlow({ orderNote }: { orderNote: string }) {
   const [error, setError] = useState("");
   const [joinList, setJoinList] = useState(true);
 
+  // Gift card
+  const [giftOpen, setGiftOpen] = useState(false);
+  const [giftCode, setGiftCode] = useState("");
+  const [giftChecking, setGiftChecking] = useState(false);
+  const [giftError, setGiftError] = useState("");
+  const [gift, setGift] = useState<{ code: string; balanceCents: number } | null>(
+    null,
+  );
+
   const deliveryFee = useMemo(() => {
     if (fulfillment !== "delivery") return 0;
     return subtotalCents >= FREE_DELIVERY_OVER_CENTS ? 0 : DELIVERY_FEE_CENTS;
   }, [fulfillment, subtotalCents]);
 
-  const total = subtotalCents + deliveryFee;
+  const gross = subtotalCents + deliveryFee;
+  // A card never pays out more than the order is worth; the rest stays on it.
+  const giftApplied = gift ? Math.min(gift.balanceCents, gross) : 0;
+  const total = gross - giftApplied;
   const minDate = earliestDate(leadTimeDays);
+
+  async function checkGiftCard() {
+    if (!giftCode.trim() || giftChecking) return;
+    setGiftChecking(true);
+    setGiftError("");
+
+    try {
+      const response = await fetch("/api/gift-cards/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: giftCode }),
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        setGift({ code: data.code, balanceCents: data.balanceCents });
+        setGiftCode("");
+      } else {
+        setGiftError(data.error ?? "We could not check that code.");
+      }
+    } catch {
+      setGiftError("We could not check that code just now.");
+    } finally {
+      setGiftChecking(false);
+    }
+  }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,6 +97,7 @@ export default function OrderFlow({ orderNote }: { orderNote: string }) {
           occasion: form.get("occasion"),
           notes: form.get("notes"),
           dietaryNotes: form.get("dietaryNotes"),
+          giftCardCode: gift?.code ?? null,
           joinList,
           items: lines.map((line) => ({
             dessertId: line.dessertId,
@@ -388,7 +427,81 @@ export default function OrderFlow({ orderNote }: { orderNote: string }) {
           ))}
         </ul>
 
-        <dl className="mt-7 space-y-2.5 border-t border-blush/60 pt-6 text-sm">
+        {/* Gift card */}
+        <div className="mt-6 border-t border-blush/60 pt-5">
+          {gift ? (
+            <div className="rounded-xl border border-rose/40 bg-cloud/50 px-4 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-candy">
+                    Gift card applied
+                  </p>
+                  <p className="mt-1 font-mono text-sm text-plum">{gift.code}</p>
+                  {gift.balanceCents > giftApplied && (
+                    <p className="mt-1 text-[0.68rem] text-ink-faint">
+                      {formatMoney(gift.balanceCents - giftApplied)} will stay on
+                      the card.
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGift(null);
+                    setGiftOpen(false);
+                  }}
+                  className="shrink-0 text-[0.68rem] text-ink-faint underline transition-colors hover:text-berry"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ) : giftOpen ? (
+            <div>
+              <label className="label" htmlFor="giftCode">
+                Gift card code
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="giftCode"
+                  value={giftCode}
+                  onChange={(e) => setGiftCode(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter here must not submit the whole order.
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      checkGiftCard();
+                    }
+                  }}
+                  className="field font-mono uppercase"
+                  placeholder="SS-XXXX-XXXX-XXXX"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={checkGiftCard}
+                  disabled={giftChecking}
+                  className="btn btn-ghost shrink-0 px-5 py-2 text-[0.7rem]"
+                >
+                  {giftChecking ? "…" : "Apply"}
+                </button>
+              </div>
+              {giftError && (
+                <p className="mt-1.5 text-xs text-berry">{giftError}</p>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setGiftOpen(true)}
+              className="text-sm text-berry underline transition-colors hover:text-plum"
+            >
+              Have a gift card?
+            </button>
+          )}
+        </div>
+
+        <dl className="mt-6 space-y-2.5 border-t border-blush/60 pt-6 text-sm">
           <div className="flex justify-between">
             <dt className="text-ink-soft">Subtotal</dt>
             <dd className="tabular-nums text-plum">{formatMoney(subtotalCents)}</dd>
@@ -401,6 +514,14 @@ export default function OrderFlow({ orderNote }: { orderNote: string }) {
               {deliveryFee === 0 ? "Free" : formatMoney(deliveryFee)}
             </dd>
           </div>
+          {giftApplied > 0 && (
+            <div className="flex justify-between">
+              <dt className="text-ink-soft">Gift card</dt>
+              <dd className="tabular-nums text-berry">
+                −{formatMoney(giftApplied)}
+              </dd>
+            </div>
+          )}
           <div className="flex justify-between border-t border-blush/60 pt-3">
             <dt className="text-base text-plum">Total</dt>
             <dd
@@ -427,8 +548,10 @@ export default function OrderFlow({ orderNote }: { orderNote: string }) {
         </button>
 
         <p className="mt-4 text-[0.68rem] leading-relaxed text-ink-faint">
-          {orderNote} No payment is taken here — we will confirm everything by
-          email first, then send a secure payment link.
+          {orderNote}{" "}
+          {total === 0
+            ? "Your gift card covers this in full, so there is nothing to pay."
+            : "No payment is taken here — we will confirm everything by email first, then send a secure payment link."}
         </p>
       </aside>
     </form>
