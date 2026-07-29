@@ -34,9 +34,10 @@ export default async function GalleryPage() {
           <p className="eyebrow">Currently on display</p>
           <h1 className="mt-4 text-[clamp(2.8rem,8vw,6rem)]">The Gallery</h1>
           <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-ink-soft sm:text-lg">
-            Eight desserts, none of them containing dairy, eggs or refined
-            sugar. Walk the room, read every placard, and take home whatever
-            you love.
+            {desserts.length} {desserts.length === 1 ? "dessert" : "desserts"},
+            none of them containing dairy, eggs or refined sugar. We would
+            rather do a few things properly than many things adequately. Walk
+            the room, read every placard, and take home whatever you love.
           </p>
 
           {activeMenu && (

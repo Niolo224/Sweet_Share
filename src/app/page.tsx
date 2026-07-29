@@ -23,25 +23,20 @@ const PROMISES = [
 
 /** Typical published values for an equivalent conventional serving. */
 const CONVENTIONAL: Record<string, { net: number; added: number; note: string }> = {
-  "chocolate-date-torte": {
-    net: 41,
-    added: 28,
-    note: "A standard slice of chocolate cake leans on white sugar for nearly all of its sweetness. Ours leans on whole dates, which arrive with their fibre still attached — and that fibre is the entire difference.",
-  },
   "chocolate-chip-cookies": {
     net: 22,
     added: 14,
     note: "A bakery chocolate chip cookie is roughly half sugar by weight once you account for the chips. We sweeten with allulose and monk fruit, neither of which the body metabolises for energy.",
   },
-  "lemon-olive-oil-cake": {
-    net: 34,
+  "cashew-cheesecake": {
+    net: 32,
     added: 24,
-    note: "Butter and refined sugar out, cold-pressed olive oil and allulose in. The crumb is every bit as tender — several guests have refused to believe us.",
+    note: "A New York cheesecake is cream cheese, eggs and a great deal of white sugar on a biscuit base. Ours is soaked cashews, coconut cream and lemon on an oat-almond crust — the same weight and the same tang, arrived at from a completely different direction.",
   },
-  "chocolate-avocado-mousse": {
-    net: 26,
-    added: 19,
-    note: "Classic mousse is cream, egg yolk and sugar. Ours is avocado, coconut and cacao, which is how it ends up with more than seven grams of fibre a jar.",
+  "double-chocolate-cookies": {
+    net: 24,
+    added: 16,
+    note: "Double chocolate usually means double sugar, because cocoa is bitter and sugar is how bakeries fix that. We use unsweetened raw cacao and let the allulose do the sweetening, so the fibre goes up while the sugar goes to nothing.",
   },
 };
 

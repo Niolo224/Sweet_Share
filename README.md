@@ -85,8 +85,8 @@ clouds, sugar dust drifting through shafts of golden light.
 `INTEGRATIONS.md` so new products can be shot to match.
 
 The Christian character of the brand is carried gently — a verse on each
-exhibit, four values on the story page, the give-one-away Share Box — never
-shouted, and never a condition of being welcome.
+exhibit and four values on the story page — never shouted, and never a
+condition of being welcome.
 
 Interaction is deliberate rather than decorative: scroll-triggered reveals,
 parallax on the hero sky, levitating desserts, a sugar-comparison slider you
@@ -101,7 +101,7 @@ By default images are served from the Higgsfield CDN so the shop looks finished
 the moment you clone it. Before going live, move them to your own domain:
 
 ```bash
-npm run media:download     # pulls all 12 images into public/images
+npm run media:download     # pulls every image and the hero loop into public/images
 ```
 
 Then add `NEXT_PUBLIC_LOCAL_MEDIA=1` to `.env`. Every reference switches over
