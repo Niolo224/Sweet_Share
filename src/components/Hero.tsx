@@ -8,6 +8,8 @@ import SparkleField from "./SparkleField";
 type Props = {
   imageUrl: string;
   imageAlt: string;
+  /** Optional ambient loop. The still image is its poster and its fallback. */
+  videoUrl?: string;
   eyebrow: string;
   title: string;
   subtitle: string;
@@ -15,9 +17,13 @@ type Props = {
   verseRef: string;
 };
 
+/** How long before the end we begin dissolving back to the still frame. */
+const LOOP_FADE_SECONDS = 0.55;
+
 export default function Hero({
   imageUrl,
   imageAlt,
+  videoUrl,
   eyebrow,
   title,
   subtitle,
@@ -25,7 +31,10 @@ export default function Hero({
   verseRef,
 }: Props) {
   const [offset, setOffset] = useState(0);
+  const [videoOpacity, setVideoOpacity] = useState(0);
+  const [playVideo, setPlayVideo] = useState(false);
   const frame = useRef<number | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // A slow parallax drift on the sky behind the words.
   useEffect(() => {
@@ -47,6 +56,41 @@ export default function Hero({
     };
   }, []);
 
+  // Only reach for the video when motion is welcome and the connection allows.
+  useEffect(() => {
+    if (!videoUrl) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const connection = (
+      navigator as Navigator & { connection?: { saveData?: boolean } }
+    ).connection;
+    if (connection?.saveData) return;
+
+    setPlayVideo(true);
+  }, [videoUrl]);
+
+  /**
+   * The loop seam.
+   *
+   * The clip was generated from the still image, so its first frame and the
+   * poster are the same picture. Dissolving the video out just before it ends
+   * lands us on that identical still — then the restart fades back in from it.
+   * The join becomes a soft breath rather than a jump cut.
+   */
+  function onTimeUpdate() {
+    const video = videoRef.current;
+    if (!video?.duration) return;
+
+    const remaining = video.duration - video.currentTime;
+    if (remaining < LOOP_FADE_SECONDS) {
+      setVideoOpacity(Math.max(0, remaining / LOOP_FADE_SECONDS));
+    } else if (video.currentTime < LOOP_FADE_SECONDS) {
+      setVideoOpacity(Math.min(1, video.currentTime / LOOP_FADE_SECONDS));
+    } else {
+      setVideoOpacity(1);
+    }
+  }
+
   return (
     <section className="relative flex min-h-[92svh] items-center justify-center overflow-hidden">
       {/* Sky */}
@@ -62,6 +106,27 @@ export default function Hero({
           sizes="100vw"
           className="object-cover"
         />
+
+        {playVideo && videoUrl && (
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            poster={imageUrl}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            aria-hidden="true"
+            onTimeUpdate={onTimeUpdate}
+            onCanPlay={() => setVideoOpacity(1)}
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{
+              opacity: videoOpacity,
+              transition: "opacity 120ms linear",
+            }}
+          />
+        )}
       </div>
 
       {/* Light wash so the type always reads */}

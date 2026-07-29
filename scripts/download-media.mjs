@@ -22,7 +22,17 @@ await mkdir(outDir, { recursive: true });
 let downloaded = 0;
 let skipped = 0;
 
-for (const [key, asset] of Object.entries(registry.assets)) {
+// Stills and the hero loop live side by side in public/images.
+const everything = {
+  ...registry.assets,
+  ...Object.fromEntries(
+    Object.entries(registry.videos ?? {}).filter(
+      ([, asset]) => asset.remote && asset.remote !== "PENDING",
+    ),
+  ),
+};
+
+for (const [key, asset] of Object.entries(everything)) {
   const target = path.join(outDir, asset.file);
 
   try {

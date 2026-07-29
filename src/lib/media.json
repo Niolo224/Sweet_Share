@@ -61,5 +61,12 @@
       "remote": "hf_20260726_145829_0531f7b7-8402-4b84-9a75-af86dc9dca86.png",
       "alt": "Two open hands offering a ribboned dessert box up into the light"
     }
+  },
+  "videos": {
+    "hero": {
+      "file": "hero-dessert-heaven.mp4",
+      "remote": "hf_20260729_013413_dd1d7692-5fd3-4eb1-a94e-5f376b9e9378.mp4",
+      "poster": "hero"
+    }
   }
 }

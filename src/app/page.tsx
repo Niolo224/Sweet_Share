@@ -9,7 +9,7 @@ import NewsletterForm from "@/components/NewsletterForm";
 import SparkleField from "@/components/SparkleField";
 import { prisma } from "@/lib/prisma";
 import { getSettings } from "@/lib/settings";
-import { media, mediaAlt } from "@/lib/media";
+import { media, mediaAlt, mediaVideo } from "@/lib/media";
 import { formatDate, netCarbs } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -97,6 +97,7 @@ export default async function HomePage() {
       <Hero
         imageUrl={media("hero")}
         imageAlt={mediaAlt("hero")}
+        videoUrl={mediaVideo("hero")}
         eyebrow={settings.heroEyebrow}
         title={settings.heroTitle}
         subtitle={settings.heroSubtitle}
