@@ -6,7 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin, checkPassword, startSession, endSession } from "@/lib/auth";
 import { storeUpload } from "@/lib/upload";
 import { setSetting } from "@/lib/settings";
-import { slugify } from "@/lib/utils";
+import { slugify, formatMoney, formatDate } from "@/lib/utils";
+import { getStripe, ACH_THRESHOLD_CENTS, siteUrl } from "@/lib/stripe";
+import { sendEmail, emailShell } from "@/lib/email";
 
 export type ActionState = { error?: string; success?: string } | null;
 
@@ -439,10 +441,137 @@ export async function setPaymentStatusAction(form: FormData) {
   const id = text(form, "id");
   const paymentStatus = text(form, "paymentStatus");
   if (!id || !paymentStatus) return;
-  if (!["unpaid", "paid", "refunded"].includes(paymentStatus)) return;
+  if (!["unpaid", "processing", "paid", "refunded"].includes(paymentStatus)) return;
 
   await prisma.order.update({ where: { id }, data: { paymentStatus } });
   revalidatePath("/admin/orders");
+}
+
+/**
+ * Turn a confirmed order into a Stripe Checkout link and email it to the guest.
+ *
+ * Deliberately not part of the public checkout: we confirm we can bake it
+ * before anyone is charged. That also means a cancelled order costs nothing,
+ * since Stripe does not return its fee on a refund.
+ */
+export async function sendPaymentLinkAction(form: FormData) {
+  await requireAdmin();
+
+  const id = text(form, "id");
+  if (!id) return;
+
+  const stripe = getStripe();
+  if (!stripe) {
+    redirect("/admin/orders?problem=Stripe+is+not+configured+on+the+server.");
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id },
+    include: { items: true },
+  });
+
+  if (!order) redirect("/admin/orders?problem=That+order+no+longer+exists.");
+  if (order.paymentStatus === "paid") {
+    redirect(`/admin/orders?problem=${order.orderNumber}+is+already+paid.`);
+  }
+
+  const lineItems = order.items.map((item) => ({
+    quantity: item.quantity,
+    price_data: {
+      currency: "usd",
+      unit_amount: item.unitPriceCents,
+      product_data: { name: item.nameSnapshot },
+    },
+  }));
+
+  if (order.deliveryFeeCents > 0) {
+    lineItems.push({
+      quantity: 1,
+      price_data: {
+        currency: "usd",
+        unit_amount: order.deliveryFeeCents,
+        product_data: { name: "Local delivery" },
+      },
+    });
+  }
+
+  const base = siteUrl();
+  const sessionOptions = {
+    mode: "payment" as const,
+    line_items: lineItems,
+    customer_email: order.email,
+    client_reference_id: order.orderNumber,
+    metadata: { orderId: order.id, orderNumber: order.orderNumber },
+    // Copied onto the charge so a refund webhook can find its way home.
+    payment_intent_data: {
+      metadata: { orderId: order.id, orderNumber: order.orderNumber },
+      description: `Sweet Share order ${order.orderNumber}`,
+    },
+    success_url: `${base}/order/paid?number=${encodeURIComponent(order.orderNumber)}`,
+    cancel_url: `${base}/order/thank-you?number=${encodeURIComponent(order.orderNumber)}`,
+  };
+
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create({
+      ...sessionOptions,
+      // Bank debit only earns its keep on the larger catering orders.
+      ...(order.totalCents >= ACH_THRESHOLD_CENTS
+        ? { payment_method_types: ["card" as const, "us_bank_account" as const] }
+        : {}),
+    });
+  } catch (error) {
+    console.error("[admin/sendPaymentLink]", error);
+    // ACH has to be switched on in the Stripe dashboard. If it is not, do not
+    // strand the order — fall back to cards so the guest can still pay.
+    try {
+      session = await stripe.checkout.sessions.create(sessionOptions);
+    } catch (fallbackError) {
+      console.error("[admin/sendPaymentLink] fallback", fallbackError);
+      redirect(
+        "/admin/orders?problem=Stripe+refused+the+request.+Check+the+server+log+and+your+API+key.",
+      );
+    }
+  }
+
+  if (!session?.url) {
+    redirect("/admin/orders?problem=Stripe+returned+no+checkout+link.");
+  }
+
+  await prisma.order.update({
+    where: { id: order.id },
+    data: {
+      stripeSessionId: session.id,
+      status: order.status === "pending" ? "confirmed" : order.status,
+    },
+  });
+
+  await sendEmail({
+    to: order.email,
+    replyTo: process.env.ORDER_NOTIFICATION_EMAIL,
+    subject: `Your Sweet Share order is confirmed — ${order.orderNumber}`,
+    html: emailShell(
+      `Good news, ${order.customerName.split(" ")[0]}`,
+      `<p>We can absolutely make this, and it is booked into the kitchen for
+       <strong>${formatDate(order.requestedDate)}</strong>${
+         order.timeWindow ? `, ${order.timeWindow}` : ""
+       }.</p>
+       <p>Whenever you are ready, here is your secure payment link:</p>
+       <p style="margin:22px 0;">
+         <a href="${session.url}"
+            style="display:inline-block;background:#ee6f94;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:999px;font-family:Arial,sans-serif;font-size:14px;letter-spacing:.08em;text-transform:uppercase;">
+           Pay ${formatMoney(order.totalCents)}
+         </a>
+       </p>
+       <p style="font-size:13px;color:#a37c93;">The link is handled entirely by
+       Stripe — we never see your card details. It stays open for 24 hours; if
+       it lapses, just reply and we will send a fresh one.</p>
+       <p>Thank you for letting us bake for you.</p>`,
+    ),
+  });
+
+  revalidatePath("/admin/orders");
+  redirect(`/admin/orders?sent=${encodeURIComponent(order.orderNumber)}`);
 }
 
 // ═══════════════════════════════════════════════════════════

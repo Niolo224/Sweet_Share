@@ -59,7 +59,7 @@ and the database is a local SQLite file.
 
 - **Overview** — open orders, revenue this month, what needs attention
 - **Orders** — every advance order, filterable, with status and payment
-  tracking and CSV export
+  tracking, one-click Stripe payment links, and CSV export
 - **Desserts** — add and edit desserts, upload photos, write ingredients and
   full nutrition, feature them, rest them for a season
 - **Menus** — build seasonal menus from your desserts, upload a printed PDF,
@@ -150,6 +150,8 @@ npm run media:download   # pull brand imagery into public/images
 See **[INTEGRATIONS.md](./INTEGRATIONS.md)** for the full playbook — hosting,
 database, payments, email, analytics, and the two non-software things (nutrition
 verification and cottage food law) that matter more than any tool.
+**[STRIPE.md](./STRIPE.md)** covers payments specifically: the webhook secret,
+test cards, and the go-live checklist.
 
 The short version: push to GitHub, import into Vercel, move the database to
 Turso or Neon, set `RESEND_API_KEY` and `BLOB_READ_WRITE_TOKEN`, and change the

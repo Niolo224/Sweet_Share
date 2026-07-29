@@ -32,25 +32,23 @@ you need a hosted database in production.
 - **Supabase** — Postgres plus file storage and auth in one. Worth it if you
   later want customer accounts.
 
-### 3. Payments — **Stripe**
+### 3. Payments — **Stripe** ✅ *already built*
 
-The order flow deliberately takes *no* payment at checkout: a guest submits a
-request, you confirm it, then you send a payment link. For a made-to-order
-bakery this is the right shape — it stops you owing a refund on something you
-cannot bake.
+Stripe Checkout is wired in. From the orders dashboard, **Send payment link**
+turns a confirmed order into a secure Stripe page and emails it to the guest;
+a signed webhook marks the order paid on its own. Orders over $200 also offer
+bank transfer, which costs 0.8% capped at $5 instead of 2.9% + 30¢.
 
-Two ways to take the money:
-
-- **Stripe Payment Links** (zero code). Create a link per order in the Stripe
-  dashboard and paste it into your confirmation email. Start here.
-- **Stripe Checkout** (a little code). Add `STRIPE_SECRET_KEY`, then create a
-  Checkout Session from the order record and email the URL. Stripe's webhook
-  flips `paymentStatus` to `paid` automatically.
+**See [STRIPE.md](./STRIPE.md)** for setup, the webhook secret, test cards, and
+the go-live checklist. The one thing you must not skip is
+`STRIPE_WEBHOOK_SECRET` — without it, payment links work but orders will not
+update themselves.
 
 Fees: **2.9% + 30¢** per card charge. No monthly cost.
 
-Alternatives: **Square** (best if you also sell in person — the card reader and
-online orders share one catalogue), **PayPal**, **Shop Pay**.
+Alternatives: **Square** (worth adding *alongside* Stripe if you start selling
+in person — free POS app, cheaper in-person rates, one catalogue),
+**PayPal**, **Shop Pay**.
 
 ### 4. Transactional email — **Resend**
 

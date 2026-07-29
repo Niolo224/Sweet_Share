@@ -3,7 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/utils";
 import StatusPill from "@/components/admin/StatusPill";
 import SubmitButton from "@/components/admin/SubmitButton";
-import { setOrderStatusAction, setPaymentStatusAction } from "../actions";
+import {
+  setOrderStatusAction,
+  setPaymentStatusAction,
+  sendPaymentLinkAction,
+} from "../actions";
+import { stripeConfigured, ACH_THRESHOLD_CENTS } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -15,15 +20,16 @@ const ORDER_STATUSES = [
   "fulfilled",
   "cancelled",
 ];
-const PAYMENT_STATUSES = ["unpaid", "paid", "refunded"];
+const PAYMENT_STATUSES = ["unpaid", "processing", "paid", "refunded"];
 
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; sent?: string; problem?: string }>;
 }) {
   await requireAdmin();
-  const { status } = await searchParams;
+  const { status, sent, problem } = await searchParams;
+  const stripeReady = stripeConfigured();
 
   const orders = await prisma.order.findMany({
     where: status && ORDER_STATUSES.includes(status) ? { status } : undefined,
@@ -48,6 +54,24 @@ export default async function AdminOrdersPage({
           Download CSV
         </a>
       </div>
+
+      {sent && (
+        <p className="mt-6 rounded-xl border border-rose/40 bg-cloud/60 px-4 py-3 text-sm text-plum">
+          Payment link emailed for <strong>{sent}</strong>. The order moves to
+          paid on its own the moment Stripe confirms.
+        </p>
+      )}
+      {problem && (
+        <p className="mt-6 rounded-xl bg-berry/10 px-4 py-3 text-sm text-berry">
+          {problem}
+        </p>
+      )}
+      {!stripeReady && (
+        <p className="mt-6 rounded-xl border border-gold/50 bg-gold/10 px-4 py-3 text-sm text-plum">
+          Stripe is not configured, so payment links are unavailable. Add{" "}
+          <code>STRIPE_SECRET_KEY</code> to your environment to switch them on.
+        </p>
+      )}
 
       <div className="mt-6 flex flex-wrap gap-2">
         <FilterLink label="All" href="/admin/orders" active={!status} />
@@ -204,7 +228,41 @@ export default async function AdminOrdersPage({
                 >
                   Email guest
                 </a>
+
+                {stripeReady && order.paymentStatus !== "paid" && (
+                  <form action={sendPaymentLinkAction}>
+                    <input type="hidden" name="id" value={order.id} />
+                    <SubmitButton
+                      className="rounded-full bg-gradient-to-r from-rose to-berry px-4 py-2 text-xs text-white"
+                      pendingLabel="Creating…"
+                      confirm={
+                        order.stripeSessionId
+                          ? `Send ${order.customerName} a fresh payment link for ${formatMoney(order.totalCents)}? The previous link stops working.`
+                          : undefined
+                      }
+                    >
+                      {order.stripeSessionId
+                        ? "Resend payment link"
+                        : `Send payment link · ${formatMoney(order.totalCents)}`}
+                    </SubmitButton>
+                  </form>
+                )}
               </div>
+
+              {stripeReady &&
+                order.paymentStatus !== "paid" &&
+                order.totalCents >= ACH_THRESHOLD_CENTS && (
+                  <p className="mt-3 text-[0.68rem] text-ink-faint">
+                    Over {formatMoney(ACH_THRESHOLD_CENTS)}, so the link offers
+                    bank transfer as well as card — about{" "}
+                    {formatMoney(
+                      Math.round(order.totalCents * 0.029) +
+                        30 -
+                        Math.min(500, Math.round(order.totalCents * 0.008)),
+                    )}{" "}
+                    cheaper for you if they use it.
+                  </p>
+                )}
             </article>
           ))}
         </div>
