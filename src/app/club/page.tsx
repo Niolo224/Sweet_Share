@@ -3,7 +3,12 @@ import Image from "next/image";
 import ClubSignup from "@/components/ClubSignup";
 import Reveal from "@/components/Reveal";
 import SparkleField from "@/components/SparkleField";
-import { PLANS } from "@/lib/plans";
+import {
+  PLANS,
+  annualCents,
+  annualSavingCents,
+  type BillingInterval,
+} from "@/lib/plans";
 import { media, mediaAlt } from "@/lib/media";
 import { formatMoney } from "@/lib/utils";
 
@@ -16,9 +21,15 @@ export const metadata: Metadata = {
 export default async function ClubPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plan?: string; cancelled?: string }>;
+  searchParams: Promise<{
+    plan?: string;
+    interval?: string;
+    cancelled?: string;
+  }>;
 }) {
-  const { plan, cancelled } = await searchParams;
+  const { plan, interval, cancelled } = await searchParams;
+  const initialInterval: BillingInterval =
+    interval === "year" ? "year" : "month";
 
   return (
     <>
@@ -90,6 +101,14 @@ export default async function ClubPage({
                         {formatMoney(saving)} less than buying it box by box
                       </p>
                     )}
+
+                    <p className="mt-3 rounded-xl bg-cloud/60 px-3.5 py-2.5 text-xs leading-relaxed text-ink-soft">
+                      <strong className="text-plum">
+                        {formatMoney(annualCents(option))} for the year
+                      </strong>{" "}
+                      — twelve boxes, eleven months paid. Saves{" "}
+                      {formatMoney(annualSavingCents(option))}.
+                    </p>
 
                     <ul className="mt-6 flex-1 space-y-2.5 border-t border-blush/60 pt-5">
                       {option.contents.map((line) => (
@@ -169,7 +188,11 @@ export default async function ClubPage({
               </p>
             )}
 
-            <ClubSignup plans={PLANS} initialPlan={plan} />
+            <ClubSignup
+              plans={PLANS}
+              initialPlan={plan}
+              initialInterval={initialInterval}
+            />
           </Reveal>
         </div>
       </section>

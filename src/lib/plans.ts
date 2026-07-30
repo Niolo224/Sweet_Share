@@ -66,3 +66,46 @@ export function findPlan(key: string) {
 
 /** Every club box is baked on the same rhythm as a normal order. */
 export const CLUB_LEAD_TIME_DAYS = 4;
+
+export type BillingInterval = "month" | "year";
+
+/**
+ * Pay for eleven months, get twelve.
+ *
+ * The discount is real but it is not the main reason to offer this. Stripe
+ * charges 2.9% + 30c per transaction, and that flat 30c is brutal on a $15
+ * box — nearly 5%. Billing once a year turns twelve fees into one and pulls
+ * the whole year's cash forward.
+ */
+export const ANNUAL_MONTHS_CHARGED = 11;
+
+export function annualCents(plan: Plan) {
+  return plan.priceCents * ANNUAL_MONTHS_CHARGED;
+}
+
+/** What a member saves by paying for the year up front. */
+export function annualSavingCents(plan: Plan) {
+  return plan.priceCents * 12 - annualCents(plan);
+}
+
+export function priceFor(plan: Plan, interval: BillingInterval) {
+  return interval === "year" ? annualCents(plan) : plan.priceCents;
+}
+
+/** Annual takings normalised to a monthly figure, for honest MRR. */
+export function monthlyEquivalentCents(
+  priceCents: number,
+  interval: string,
+) {
+  return interval === "year" ? Math.round(priceCents / 12) : priceCents;
+}
+
+/**
+ * What the shop keeps after Stripe, per member per year. Used to show the
+ * owner why annual is worth offering at all.
+ */
+export function annualFeeSavingCents(plan: Plan) {
+  const monthlyFees = 12 * (Math.round(plan.priceCents * 0.029) + 30);
+  const annualFee = Math.round(annualCents(plan) * 0.029) + 30;
+  return monthlyFees - annualFee;
+}

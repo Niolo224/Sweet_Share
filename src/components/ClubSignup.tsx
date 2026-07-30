@@ -2,18 +2,27 @@
 
 import { useState } from "react";
 import { formatMoney } from "@/lib/utils";
-import type { Plan } from "@/lib/plans";
+import {
+  type Plan,
+  type BillingInterval,
+  priceFor,
+  annualCents,
+  annualSavingCents,
+} from "@/lib/plans";
 
 export default function ClubSignup({
   plans,
   initialPlan,
+  initialInterval = "month",
 }: {
   plans: Plan[];
   initialPlan?: string;
+  initialInterval?: BillingInterval;
 }) {
   const [planKey, setPlanKey] = useState(
     initialPlan ?? plans.find((p) => p.featured)?.key ?? plans[0]?.key ?? "",
   );
+  const [interval, setInterval] = useState<BillingInterval>(initialInterval);
   const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("pickup");
   const [joinList, setJoinList] = useState(true);
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
@@ -35,6 +44,7 @@ export default function ClubSignup({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           plan: planKey,
+          interval,
           customerName: form.get("customerName"),
           email: form.get("email"),
           phone: form.get("phone"),
@@ -62,11 +72,51 @@ export default function ClubSignup({
 
   return (
     <form onSubmit={onSubmit} className="card-plinth rounded-[1.75rem] p-8 sm:p-10">
+      {/* Monthly or yearly */}
       <fieldset>
+        <legend className="label">How would you like to pay?</legend>
+        <div className="mt-1 inline-flex w-full rounded-full border border-blush bg-white/60 p-1">
+          {(
+            [
+              { value: "month" as const, label: "Monthly" },
+              { value: "year" as const, label: "Yearly" },
+            ]
+          ).map((option) => {
+            const active = interval === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setInterval(option.value)}
+                aria-pressed={active}
+                className={`flex-1 rounded-full px-4 py-2.5 text-sm font-medium transition-all duration-400 ${
+                  active
+                    ? "bg-gradient-to-r from-rose to-berry text-white shadow-[0_8px_20px_-10px_rgba(201,63,108,.9)]"
+                    : "text-ink-soft hover:text-berry"
+                }`}
+              >
+                {option.label}
+                {option.value === "year" && (
+                  <span
+                    className={`ml-2 rounded-full px-2 py-0.5 text-[0.6rem] uppercase tracking-[0.1em] ${
+                      active ? "bg-white/25 text-white" : "bg-cloud text-berry"
+                    }`}
+                  >
+                    1 month free
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
+
+      <fieldset className="mt-7">
         <legend className="label">Which box?</legend>
         <div className="mt-2 space-y-3">
           {plans.map((option) => {
             const active = planKey === option.key;
+            const charge = priceFor(option, interval);
             return (
               <button
                 key={option.key}
@@ -87,13 +137,19 @@ export default function ClubSignup({
                     {option.name}
                   </span>
                   <span className="text-lg text-berry">
-                    {formatMoney(option.priceCents)}
+                    {formatMoney(charge)}
                     <span className="ml-1 text-[0.65rem] uppercase tracking-[0.14em] text-ink-faint">
-                      / month
+                      / {interval === "year" ? "year" : "month"}
                     </span>
                   </span>
                 </div>
                 <p className="mt-1 text-sm text-ink-soft">{option.tagline}</p>
+                {interval === "year" && (
+                  <p className="mt-1.5 text-xs text-ink-faint">
+                    Twelve boxes for the price of eleven — saving{" "}
+                    {formatMoney(annualSavingCents(option))}
+                  </p>
+                )}
               </button>
             );
           })}
@@ -248,14 +304,31 @@ export default function ClubSignup({
         {status === "sending"
           ? "Taking you to checkout…"
           : plan
-            ? `Join — ${formatMoney(plan.priceCents)} a month`
+            ? `Join — ${formatMoney(priceFor(plan, interval))} ${
+                interval === "year" ? "for the year" : "a month"
+              }`
             : "Choose a box"}
       </button>
 
       <p className="mt-4 text-center text-[0.68rem] leading-relaxed text-ink-faint">
-        Billed monthly through Stripe. Pause or cancel whenever you like — just
-        write to us and it is done, no forms and no persuading.
+        {interval === "year" ? (
+          <>
+            Paid once through Stripe, then a box every month for twelve months.
+            Renews yearly, and you can stop it any time — just write to us.
+          </>
+        ) : (
+          <>
+            Billed monthly through Stripe. Pause or cancel whenever you like —
+            just write to us and it is done, no forms and no persuading.
+          </>
+        )}
       </p>
+      {interval === "year" && plan && (
+        <p className="mt-2 text-center text-[0.68rem] text-ink-faint">
+          That is {formatMoney(Math.round(annualCents(plan) / 12))} a month,
+          effectively.
+        </p>
+      )}
     </form>
   );
 }

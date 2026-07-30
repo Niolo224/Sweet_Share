@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatMoney, formatDate } from "@/lib/utils";
-import { PLANS, findPlan } from "@/lib/plans";
+import { PLANS, findPlan, monthlyEquivalentCents } from "@/lib/plans";
 import StatusPill from "@/components/admin/StatusPill";
 import SubmitButton from "@/components/admin/SubmitButton";
 import { cancelSubscriptionAction } from "../actions";
@@ -20,7 +20,7 @@ export default async function AdminClubPage() {
     }),
     prisma.subscription.findMany({
       where: { status: { in: ["active", "past_due"] } },
-      select: { plan: true, priceCents: true, status: true },
+      select: { plan: true, priceCents: true, status: true, interval: true },
     }),
     prisma.order.findMany({
       where: {
@@ -32,9 +32,17 @@ export default async function AdminClubPage() {
     }),
   ]);
 
+  // Annual members are spread across twelve months so the figure stays honest.
   const mrr = active
     .filter((m) => m.status === "active")
-    .reduce((sum, m) => sum + m.priceCents, 0);
+    .reduce(
+      (sum, m) => sum + monthlyEquivalentCents(m.priceCents, m.interval),
+      0,
+    );
+
+  const annualMembers = active.filter(
+    (m) => m.interval === "year" && m.status === "active",
+  ).length;
 
   const byPlan = PLANS.map((plan) => ({
     plan,
@@ -51,7 +59,15 @@ export default async function AdminClubPage() {
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <Stat label="Monthly recurring" value={formatMoney(mrr)} />
+        <Stat
+          label="Monthly recurring"
+          value={formatMoney(mrr)}
+          note={
+            annualMembers > 0
+              ? `${annualMembers} paid yearly, spread across 12 months`
+              : undefined
+          }
+        />
         <Stat
           label="Active members"
           value={active.filter((m) => m.status === "active").length}
@@ -143,6 +159,9 @@ export default async function AdminClubPage() {
                           {member.customerName}
                         </h3>
                         <StatusPill status={member.status} />
+                        {member.interval === "year" && (
+                          <span className="badge">Paid yearly</span>
+                        )}
                       </div>
                       <p className="mt-1 text-xs text-ink-faint">
                         <a
@@ -180,11 +199,17 @@ export default async function AdminClubPage() {
                         {formatMoney(member.priceCents)}
                       </p>
                       <p className="text-[0.65rem] text-ink-faint">
-                        {plan?.name ?? member.plan} · monthly
+                        {plan?.name ?? member.plan} ·{" "}
+                        {member.interval === "year" ? "yearly" : "monthly"}
                       </p>
                       {member.currentPeriodEnd && (
                         <p className="mt-1 text-[0.65rem] text-ink-faint">
                           Renews {formatDate(member.currentPeriodEnd, "short")}
+                        </p>
+                      )}
+                      {member.nextBoxAt && member.status === "active" && (
+                        <p className="mt-1 text-[0.65rem] text-candy">
+                          Next box {formatDate(member.nextBoxAt, "short")}
                         </p>
                       )}
                     </div>

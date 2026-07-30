@@ -3,10 +3,11 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, clientKey } from "@/lib/rate-limit";
 import { getStripe, siteUrl } from "@/lib/stripe";
-import { findPlan } from "@/lib/plans";
+import { findPlan, priceFor, annualSavingCents } from "@/lib/plans";
 
 const schema = z.object({
   plan: z.string().min(1),
+  interval: z.enum(["month", "year"]).default("month"),
   customerName: z.string().min(1, "Please tell us your name.").max(120),
   email: z.string().email("We need a working email address."),
   phone: z.string().max(40).optional().nullable(),
@@ -87,13 +88,17 @@ export async function POST(request: Request) {
       );
     }
 
+    // The price is derived from the plan and interval here, never sent up.
+    const chargeCents = priceFor(plan, data.interval);
+
     const subscription = await prisma.subscription.create({
       data: {
         customerName: data.customerName.trim(),
         email,
         phone: data.phone?.trim() || null,
         plan: plan.key,
-        priceCents: plan.priceCents,
+        priceCents: chargeCents,
+        interval: data.interval,
         fulfillment: data.fulfillment,
         address: data.address?.trim() || null,
         city: data.city?.trim() || null,
@@ -113,19 +118,34 @@ export async function POST(request: Request) {
           quantity: 1,
           price_data: {
             currency: "usd",
-            unit_amount: plan.priceCents,
-            recurring: { interval: "month" },
+            unit_amount: chargeCents,
+            recurring: { interval: data.interval },
             product_data: {
               name: `Sweet Share Club — ${plan.name}`,
-              description: plan.contents.join(" · "),
+              description:
+                data.interval === "year"
+                  ? `${plan.contents.join(" · ")} — twelve boxes, eleven months paid`
+                  : plan.contents.join(" · "),
             },
           },
         },
       ],
       customer_email: email,
-      metadata: { subscriptionId: subscription.id, kind: "club", plan: plan.key },
+      metadata: {
+        subscriptionId: subscription.id,
+        kind: "club",
+        plan: plan.key,
+        interval: data.interval,
+      },
       subscription_data: {
-        metadata: { subscriptionId: subscription.id, plan: plan.key },
+        metadata: {
+          subscriptionId: subscription.id,
+          plan: plan.key,
+          interval: data.interval,
+          ...(data.interval === "year"
+            ? { annualSaving: String(annualSavingCents(plan)) }
+            : {}),
+        },
       },
       success_url: `${base}/club/welcome?id=${subscription.id}`,
       cancel_url: `${base}/club?cancelled=1`,

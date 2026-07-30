@@ -51,7 +51,7 @@ and the database is a local SQLite file.
 | `/story` | Story, mission, the four values, a note from the kitchen |
 | `/gatherings` | Upcoming events with live RSVP and seat counts |
 | `/testimonials` | All approved reviews, rating distribution, and a form to leave one |
-| `/club` | The Sweet Share Club — three monthly box tiers, billed by Stripe |
+| `/club` | The Sweet Share Club — three box tiers, billed monthly or yearly (twelve boxes for eleven months' price) |
 | `/gift-cards` | Buy a gift card, sent straight to the recipient with a note |
 | `/order` | Advance-order basket with lead-time enforcement, gift card redemption, pickup or delivery, allergy notes |
 | `/faq` | Questions and facts, including the honest ones about sugar |

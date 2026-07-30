@@ -156,13 +156,53 @@ file changes what *new* members pay and touches nobody already subscribed.
 No Products or Prices need creating in the dashboard: Checkout is given an
 inline recurring price, so the club works the moment your keys are set.
 
-Each month `invoice.paid` raises an ordinary kitchen order — already confirmed
-and marked paid — so club boxes appear in your normal Orders list alongside
-everything else. The invoice id is stored uniquely against the order, so a
-replayed webhook can never raise the same box twice.
+### Monthly or yearly
 
-To test: join at `/club` with `4242 4242 4242 4242`, then use
-`stripe trigger invoice.paid` to simulate the following month.
+Members choose at signup. Yearly is **eleven months' price for twelve boxes** —
+a genuine discount, but the real reason to offer it is fees. Stripe takes
+2.9% + 30¢ per charge, and on a $15 box that flat 30¢ is nearly 5%. Billing
+once a year turns twelve fees into one and pulls the whole year's cash forward.
+
+| Plan | Monthly | Yearly | Member saves | You save in fees |
+|---|---|---|---|---|
+| Little Box | $15 | $165 | $15 | ~$3.20/yr |
+| Cookie Club | $30 | $330 | $30 | ~$3.20/yr |
+| Full Table | $64 | $704 | $64 | ~$3.20/yr |
+
+### How boxes get raised — and why it is not `invoice.paid`
+
+**Billing and baking are separate.** A monthly member pays twelve times and
+eats twelve times, so tying boxes to payments looks fine. An annual member pays
+*once* and still eats twelve times — tie boxes to `invoice.paid` and they get a
+single box for the whole year.
+
+So each member carries their own `nextBoxAt` clock, advanced one month at a
+time, and a daily job raises whatever is due. Payments only decide whether that
+clock keeps running: a `past_due` member gets no boxes until Stripe collects.
+
+Every box is keyed `<subscriptionId>:<YYYY-MM>` on a unique column, so no
+combination of retries, replayed webhooks and overlapping job runs can raise
+the same month twice. The job also raises at most one box per member per run —
+if it has been down for months, it catches up a day at a time rather than
+dumping a year of baking on you at once.
+
+### The daily job
+
+`vercel.json` schedules `/api/cron/club-boxes` for 07:00 UTC daily. Set
+`CRON_SECRET` in your environment and Vercel sends it automatically. Any
+scheduler works — cron-job.org, GitHub Actions, a crontab — as long as it sends
+`Authorization: Bearer $CRON_SECRET`.
+
+**If this job never runs, no club boxes are ever raised.** Everything else will
+look healthy: Stripe bills, members are charged, the dashboard shows them
+active — and nothing appears in your kitchen. Check it after your first deploy.
+
+To test: join at `/club` with `4242 4242 4242 4242`, then call the job by hand:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  http://localhost:3000/api/cron/club-boxes
+```
 
 ## Going live
 
@@ -194,6 +234,15 @@ Verified locally, offline:
   not return it twice.
 - Gift card codes are matched after normalising, so `ss test test test`
   resolves to `SS-TEST-TEST-TEST` and an unknown code is refused.
+- An annual member starting on the 31st receives twelve boxes across twelve
+  consecutive calendar months with no gaps, extra job runs raise nothing, and a
+  `past_due` member receives none.
+- The cron endpoint refuses requests with no token or a wrong token.
+
+That annual test earned its keep: the first version skipped February entirely,
+because "30 January plus one month" is 30 February, which JavaScript rolls
+forward into March. Any member joining on the 29th to 31st would have lost a
+box a year, silently. Fixed by clamping to the length of the target month.
 
 Not verified: anything requiring Stripe's servers. `api.stripe.com` is blocked
 by the network policy on the machine this was built on, so **no Checkout

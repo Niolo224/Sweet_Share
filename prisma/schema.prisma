@@ -238,6 +238,9 @@ model Order {
   stripeSessionId String?
   /// Unique, so a replayed club invoice can never raise a second box.
   stripeInvoiceId String? @unique
+  /// "<subscriptionId>:<YYYY-MM>" — one box per member per month, whatever
+  /// raises it and however many times the job runs.
+  clubBoxKey      String? @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -312,7 +315,14 @@ model Subscription {
 
   /// Matches a key in src/lib/plans.ts
   plan       String
+  /// What they are charged each billing cycle — a month's price, or a year's.
   priceCents Int
+  /// month | year. Annual members pay once and still get a box every month.
+  interval   String @default("month")
+
+  /// When the next monthly box is due to be raised. Billing and baking are
+  /// deliberately separate: an annual member bills once but bakes twelve times.
+  nextBoxAt DateTime?
 
   /// pickup | delivery
   fulfillment  String  @default("pickup")

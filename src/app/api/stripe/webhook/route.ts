@@ -3,8 +3,8 @@ import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { getStripe } from "@/lib/stripe";
 import { sendEmail, emailShell } from "@/lib/email";
-import { findPlan, CLUB_LEAD_TIME_DAYS } from "@/lib/plans";
-import { formatMoney, formatDate, orderNumber } from "@/lib/utils";
+import { raiseDueBoxes, startBoxClock } from "@/lib/club";
+import { formatMoney, formatDate } from "@/lib/utils";
 
 /**
  * Stripe's side of the conversation.
@@ -176,102 +176,6 @@ async function activateGiftCard(giftCardId: string) {
   }
 }
 
-/** A paid club invoice becomes an ordinary kitchen order. */
-async function raiseClubBox(invoice: Stripe.Invoice) {
-  const stripeSubscriptionId = invoiceSubscriptionId(invoice);
-  if (!stripeSubscriptionId) return;
-
-  const subscription = await prisma.subscription.findUnique({
-    where: { stripeSubscriptionId },
-  });
-  if (!subscription) return;
-
-  const plan = findPlan(subscription.plan);
-  if (!plan) {
-    console.error(`[stripe/webhook] Unknown plan "${subscription.plan}".`);
-    return;
-  }
-
-  const requestedDate = new Date();
-  requestedDate.setDate(requestedDate.getDate() + CLUB_LEAD_TIME_DAYS);
-  requestedDate.setHours(12, 0, 0, 0);
-
-  try {
-    await prisma.order.create({
-      data: {
-        orderNumber: orderNumber(),
-        // Unique — a replayed invoice cannot raise a second box.
-        stripeInvoiceId: invoice.id,
-        subscriptionId: subscription.id,
-        customerName: subscription.customerName,
-        email: subscription.email,
-        phone: subscription.phone,
-        fulfillment: subscription.fulfillment,
-        requestedDate,
-        address: subscription.address,
-        city: subscription.city,
-        postalCode: subscription.postalCode,
-        occasion: `Club box — ${plan.name}`,
-        notes: plan.contents.join("\n"),
-        dietaryNotes: subscription.dietaryNotes,
-        subtotalCents: subscription.priceCents,
-        deliveryFeeCents: 0,
-        totalCents: subscription.priceCents,
-        status: "confirmed",
-        paymentStatus: "paid",
-        items: {
-          create: [
-            {
-              nameSnapshot: `${plan.name} — club box`,
-              unitPriceCents: subscription.priceCents,
-              quantity: 1,
-            },
-          ],
-        },
-      },
-    });
-  } catch (error) {
-    // A unique-constraint failure just means we already raised this box.
-    const code = (error as { code?: string }).code;
-    if (code === "P2002") return;
-    throw error;
-  }
-
-  await sendEmail({
-    to: subscription.email,
-    subject: `Your ${plan.name} is being baked`,
-    html: emailShell(
-      `This month's box, ${subscription.customerName.split(" ")[0]}`,
-      `<p>Your club payment has gone through and this month's box is booked
-       into the kitchen for <strong>${formatDate(requestedDate)}</strong>.</p>
-       <p><strong>${plan.name}</strong><br/>${plan.contents.join("<br/>")}</p>
-       <p>${
-         subscription.fulfillment === "delivery"
-           ? "We will bring it to you."
-           : "We will email you when it is ready to collect."
-       }</p>
-       <p style="font-size:13px;color:#a37c93;">To pause, change or cancel your
-       membership, just reply to this email and we will sort it out.</p>`,
-    ),
-  });
-
-  const notify = process.env.ORDER_NOTIFICATION_EMAIL;
-  if (notify) {
-    await sendEmail({
-      to: notify,
-      subject: `Club box due — ${plan.name} for ${subscription.customerName}`,
-      html: emailShell(
-        "A club box needs baking",
-        `<p><strong>${subscription.customerName}</strong> · ${plan.name}<br/>
-         Due ${formatDate(requestedDate)} ·
-         ${subscription.fulfillment === "delivery" ? "Delivery" : "Collection"}</p>
-         <p>${plan.contents.join("<br/>")}</p>
-         ${subscription.dietaryNotes ? `<p><strong>Dietary:</strong> ${subscription.dietaryNotes}</p>` : ""}`,
-      ),
-    });
-  }
-}
-
 export async function POST(request: Request) {
   const stripe = getStripe();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -316,8 +220,7 @@ export async function POST(request: Request) {
         if (kind === "club") {
           const subscriptionId = session.metadata?.subscriptionId;
           if (!subscriptionId) break;
-          // invoice.paid raises the first box; here we just record the ids so
-          // later subscription events can be matched back to our record.
+
           await prisma.subscription.update({
             where: { id: subscriptionId },
             data: {
@@ -333,6 +236,11 @@ export async function POST(request: Request) {
               startedAt: new Date(),
             },
           });
+
+          // Start the baking clock and raise the first box straight away,
+          // rather than making a new member wait for tomorrow's job.
+          await startBoxClock(subscriptionId);
+          await raiseDueBoxes(subscriptionId);
           break;
         }
 
@@ -455,7 +363,26 @@ export async function POST(request: Request) {
       }
 
       case "invoice.paid": {
-        await raiseClubBox(event.data.object);
+        const stripeSubscriptionId = invoiceSubscriptionId(event.data.object);
+        if (!stripeSubscriptionId) break;
+
+        const ours = await prisma.subscription.findUnique({
+          where: { stripeSubscriptionId },
+        });
+        if (!ours) break;
+
+        /**
+         * A payment renews the right to boxes; it does not itself decide how
+         * many. A monthly invoice buys one month, an annual invoice buys
+         * twelve — either way the member's own clock hands them out one at a
+         * time, and the daily job keeps it turning.
+         */
+        await prisma.subscription.update({
+          where: { id: ours.id },
+          data: { status: "active" },
+        });
+        await startBoxClock(ours.id);
+        await raiseDueBoxes(ours.id);
         break;
       }
 
