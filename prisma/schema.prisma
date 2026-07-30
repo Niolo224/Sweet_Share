@@ -1,16 +1,24 @@
 // Sweet Share — data model
 //
-// SQLite is used by default so the shop runs the moment you clone it.
-// To move to Postgres (Neon / Supabase) change `provider` to "postgresql";
-// every model below is portable as-is.
+// Postgres, so that development and production are the same database. Works
+// with Supabase, Neon, Railway, or a Postgres you run yourself.
+//
+// Supabase and other poolers hand out two connection strings, and Prisma needs
+// both:
+//   DATABASE_URL — the pooled one (port 6543 on Supabase), used at runtime
+//   DIRECT_URL   — the direct one (port 5432), used for migrations, which a
+//                  pooler cannot carry
+//
+// If your provider has no pooler, set both to the same string.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 /// A single dessert in the collection.

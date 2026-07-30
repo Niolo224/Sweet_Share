@@ -92,56 +92,95 @@ export async function redeem(
 > {
   const normalised = normaliseCode(code);
 
-  try {
-    return await prisma.$transaction(async (tx) => {
-      const card = await tx.giftCard.findUnique({ where: { code: normalised } });
-
-      if (!card || card.status !== "active" || card.balanceCents <= 0) {
-        return { ok: false as const, error: "That card cannot be used." };
-      }
-
-      const applied = Math.min(card.balanceCents, requestedCents);
-      if (applied <= 0) {
-        return { ok: false as const, error: "Nothing left to apply." };
-      }
-
-      const updated = await tx.giftCard.updateMany({
-        where: { id: card.id, balanceCents: { gte: applied } },
-        data: { balanceCents: { decrement: applied } },
-      });
-
-      // Somebody else spent it between our read and our write.
-      if (updated.count === 0) {
-        return { ok: false as const, error: "That card was just used elsewhere." };
-      }
-
-      const remaining = card.balanceCents - applied;
-      if (remaining === 0) {
-        await tx.giftCard.update({
-          where: { id: card.id },
-          data: { status: "spent" },
+  /**
+   * Losing the conditional update means somebody else spent from this card
+   * between our read and our write. That is not a failure — it just means our
+   * idea of the balance is stale. Read it again and take what is actually
+   * left.
+   *
+   * Without this, simultaneous orders on one card all read the same balance,
+   * all but one lose the race, and those customers are told the card "was just
+   * used elsewhere" even when there is still money on it. Postgres runs writes
+   * genuinely in parallel, so this happens for real; SQLite's single writer
+   * hides it.
+   */
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const outcome = await prisma.$transaction(async (tx) => {
+        const card = await tx.giftCard.findUnique({
+          where: { code: normalised },
         });
-      }
 
-      const redemption = await tx.giftCardRedemption.create({
-        data: {
-          giftCardId: card.id,
-          orderId: context.orderId,
-          orderNumber: context.orderNumber,
-          amountCents: applied,
-        },
+        if (!card || card.status === "void") {
+          return { state: "dead" as const, error: "That card cannot be used." };
+        }
+        if (card.balanceCents <= 0) {
+          return { state: "dead" as const, error: "That card has been fully spent." };
+        }
+        if (card.status !== "active") {
+          return {
+            state: "dead" as const,
+            error: "That card is not active yet.",
+          };
+        }
+
+        const applied = Math.min(card.balanceCents, requestedCents);
+        if (applied <= 0) {
+          return { state: "dead" as const, error: "Nothing left to apply." };
+        }
+
+        const updated = await tx.giftCard.updateMany({
+          where: { id: card.id, balanceCents: { gte: applied } },
+          data: { balanceCents: { decrement: applied } },
+        });
+
+        // Stale read — try again with whatever the balance is now.
+        if (updated.count === 0) return { state: "contended" as const };
+
+        if (card.balanceCents - applied === 0) {
+          await tx.giftCard.update({
+            where: { id: card.id },
+            data: { status: "spent" },
+          });
+        }
+
+        const redemption = await tx.giftCardRedemption.create({
+          data: {
+            giftCardId: card.id,
+            orderId: context.orderId,
+            orderNumber: context.orderNumber,
+            amountCents: applied,
+          },
+        });
+
+        return {
+          state: "done" as const,
+          appliedCents: applied,
+          redemptionId: redemption.id,
+        };
       });
 
-      return {
-        ok: true as const,
-        appliedCents: applied,
-        redemptionId: redemption.id,
-      };
-    });
-  } catch (error) {
-    console.error("[giftcards/redeem]", error);
-    return { ok: false, error: "We could not apply that card just now." };
+      if (outcome.state === "done") {
+        return {
+          ok: true,
+          appliedCents: outcome.appliedCents,
+          redemptionId: outcome.redemptionId,
+        };
+      }
+      if (outcome.state === "dead") {
+        return { ok: false, error: outcome.error };
+      }
+      // contended — loop round and re-read.
+    } catch (error) {
+      console.error("[giftcards/redeem]", error);
+      return { ok: false, error: "We could not apply that card just now." };
+    }
   }
+
+  return {
+    ok: false,
+    error: "That card is busy on another order. Please try again in a moment.",
+  };
 }
 
 /** Undo a redemption that was taken for an order which then failed to save. */

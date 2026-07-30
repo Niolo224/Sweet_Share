@@ -18,23 +18,30 @@ sugar**, sweetened with dates, monk fruit and allulose.
 ```bash
 npm install
 cp .env.example .env       # then edit it — see below
-npm run setup              # creates the database and fills it with the opening collection
+npm run setup              # creates the tables and fills them with the opening collection
 npm run dev                # http://localhost:3000
 ```
+
+You need a Postgres database first — [Supabase](https://supabase.com)'s free
+tier takes about two minutes to set up, and **[DEPLOY.md](./DEPLOY.md)** walks
+through it. Development and production use the same database engine
+deliberately, so nothing behaves differently once it is live.
 
 Sign in to the dashboard at **`/admin`** using the `ADMIN_PASSWORD` from your
 `.env`.
 
-### The two variables you must change
+### The variables you must set
 
 ```env
+DATABASE_URL="postgresql://…"   # pooled connection, port 6543 on Supabase
+DIRECT_URL="postgresql://…"     # direct connection, port 5432 — for migrations
 ADMIN_PASSWORD="something only you know"
 SESSION_SECRET="a long random string — openssl rand -base64 32"
 ```
 
-Everything else in `.env.example` is optional. The shop runs fully without a
-single integration: emails log to the console, uploads go to `public/uploads`,
-and the database is a local SQLite file.
+Everything else in `.env.example` is optional. Without Stripe the shop still
+takes orders and you arrange payment yourself; without Resend, emails print to
+the server log instead of sending.
 
 ---
 
@@ -120,7 +127,7 @@ with no other change.
 - **Next.js 15** (App Router, React 19, Server Actions)
 - **TypeScript**, strict
 - **Tailwind CSS v4** with a custom design-token theme
-- **Prisma** + SQLite locally, portable to Postgres or Turso
+- **Prisma** + Postgres (Supabase, Neon, or your own)
 - **Zod** for validating every inbound request
 - No component library, no CSS framework beyond Tailwind, no client-side state
   library — the basket is a small context over `localStorage`
@@ -153,15 +160,15 @@ npm run media:download   # pull brand imagery into public/images
 
 ## Deploying
 
-See **[INTEGRATIONS.md](./INTEGRATIONS.md)** for the full playbook — hosting,
-database, payments, email, analytics, and the two non-software things (nutrition
-verification and cottage food law) that matter more than any tool.
-**[STRIPE.md](./STRIPE.md)** covers payments specifically: the webhook secret,
-test cards, and the go-live checklist.
+**[DEPLOY.md](./DEPLOY.md)** is the step-by-step: Supabase, Vercel, the Stripe
+webhook and its nine events, the daily club job, and the domain. Start there.
 
-The short version: push to GitHub, import into Vercel, move the database to
-Turso or Neon, set `RESEND_API_KEY` and `BLOB_READ_WRITE_TOKEN`, and change the
-admin password.
+**[STRIPE.md](./STRIPE.md)** covers payments in depth — how gift cards and the
+club work, test cards, and what was and was not verified.
+
+**[INTEGRATIONS.md](./INTEGRATIONS.md)** is the wider playbook: analytics, email
+marketing, delivery, and the two non-software things (nutrition verification and
+cottage food law) that matter more than any tool on the list.
 
 ---
 
