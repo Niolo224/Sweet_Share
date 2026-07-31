@@ -13,9 +13,16 @@ import { media, mediaAlt } from "@/lib/media";
 import { formatMoney } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "The Sweet Share Club",
+  title: "The Sweet Share Club — a dessert box every month",
   description:
-    "A box of plant-based, diabetes-friendly desserts every month. No dairy, no eggs, no refined sugar. Pause or cancel any time.",
+    "A box of plant-based, diabetes-friendly desserts every month, from $15. No dairy, no eggs, no refined sugar. Pay yearly for twelve boxes at eleven months' price. Pause or cancel any time.",
+  alternates: { canonical: "/club" },
+  openGraph: {
+    title: "The Sweet Share Club · Sweet Share",
+    description:
+      "A vegan, diabetes-friendly dessert box every month, from $15. Pause or cancel any time.",
+    url: "/club",
+  },
 };
 
 export default async function ClubPage({

@@ -9,9 +9,16 @@ import { media, mediaAlt } from "@/lib/media";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Contact & Catering",
+  title: "Contact & Catering — vegan dessert catering for events",
   description:
-    "Talk to Sweet Share about catering, wholesale, custom orders or anything at all. We answer every message ourselves.",
+    "Talk to Sweet Share about catering, wholesale, custom orders or anything at all. Vegan, diabetes-friendly dessert catering for weddings, church lunches and corporate events. We answer every message ourselves.",
+  alternates: { canonical: "/contact" },
+  openGraph: {
+    title: "Contact & Catering · Sweet Share",
+    description:
+      "Vegan, diabetes-friendly dessert catering for weddings, church lunches and events.",
+    url: "/contact",
+  },
 };
 
 const REASONS = [

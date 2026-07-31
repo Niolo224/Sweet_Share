@@ -164,3 +164,42 @@ video switch to `/images/…` on your own domain.
 real orders, switch to `prisma migrate dev` / `prisma migrate deploy` so
 changes are versioned and reviewable. `db push --accept-data-loss` can drop
 columns without asking; never point it at a database holding orders.
+
+---
+
+## 7. Search and answer engines
+
+The site ships SEO and AEO (answer-engine optimisation) already wired in. Three
+things to do once you are live:
+
+1. **[Google Search Console](https://search.google.com/search-console)** — add
+   `sweetshare.shop`, verify by DNS, submit `https://sweetshare.shop/sitemap.xml`.
+2. **[Bing Webmaster Tools](https://www.bing.com/webmasters)** — same, and it
+   feeds Copilot.
+3. **Google Business Profile** — for a local food business this outranks almost
+   everything else. Free, and worth an hour.
+
+### What is already built
+
+| File | Purpose |
+|---|---|
+| `/sitemap.xml` | Generated from the database — new desserts appear automatically |
+| `/robots.txt` | Invites GPTBot, ClaudeBot, PerplexityBot, Google-Extended and others in; keeps them out of `/admin` and order pages |
+| `/llms.txt` | A plain-language brief for AI assistants, built live from your menu |
+
+Every dessert page publishes `schema.org/Product` including a full
+`NutritionInformation` block, net carbs, allergens, price, availability and
+real reviews. The FAQ publishes `FAQPage`; gatherings publish `Event`; every
+page has a canonical URL and its own social card.
+
+**Why the nutrition markup matters more than anything else here.** When someone
+asks an assistant "where can I get a dessert that won't spike my blood sugar",
+prose gets paraphrased and hedged — a machine-readable nutrition panel gets
+quoted. That structured data is the single strongest reason an answer engine
+would name Sweet Share instead of describing a category.
+
+### Keep it honest
+
+The `llms.txt` file states the caveats as plainly as the claims — estimates not
+lab analysis, shared kitchen, not medical advice. Leave that in. An assistant
+that repeats your caveats is one that can be trusted to repeat your claims.

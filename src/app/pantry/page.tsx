@@ -9,9 +9,16 @@ import { media, mediaAlt } from "@/lib/media";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "The Pantry",
+  title: "The Pantry — every ingredient, and its glycemic index",
   description:
-    "Every ingredient we bake with, explained plainly — what it is, why we chose it, and what it does to blood sugar. Dates, monk fruit, allulose, almond flour, flaxseed and more.",
+    "Every ingredient we bake with, explained plainly: what it is, why we chose it, and what it does to blood sugar. Allulose, monk fruit, medjool dates, almond flour, oat flour, flaxseed, cashews and cacao — with glycemic index for each.",
+  alternates: { canonical: "/pantry" },
+  openGraph: {
+    title: "The Pantry · Sweet Share",
+    description:
+      "Allulose, monk fruit, dates and more — what each ingredient is and what it does to blood sugar.",
+    url: "/pantry",
+  },
 };
 
 const KIND_LABELS: Record<string, string> = {

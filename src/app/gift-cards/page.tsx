@@ -7,9 +7,16 @@ import SparkleField from "@/components/SparkleField";
 import { media, mediaAlt } from "@/lib/media";
 
 export const metadata: Metadata = {
-  title: "Gift Cards",
+  title: "Gift Cards — dessert for someone who thought it was off the table",
   description:
-    "Send a Sweet Share gift card — plant-based, diabetes-friendly desserts for someone who thought dessert was off the table. Never expires.",
+    "Send a Sweet Share gift card. Plant-based, diabetes-friendly desserts with no dairy, eggs or refined sugar. Emailed straight to them with your note. Never expires, and unspent balance stays on the card.",
+  alternates: { canonical: "/gift-cards" },
+  openGraph: {
+    title: "Gift Cards · Sweet Share",
+    description:
+      "Dessert for someone who thought dessert was off the table. Never expires.",
+    url: "/gift-cards",
+  },
 };
 
 const REASONS = [

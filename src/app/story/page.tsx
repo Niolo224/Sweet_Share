@@ -10,9 +10,16 @@ import { media, mediaAlt } from "@/lib/media";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Our Story",
+  title: "Our Story — why we bake without sugar",
   description:
-    "Why Sweet Share exists: so that nobody has to sit out the dessert course. Our story, our mission, and the values we bake by.",
+    "Sweet Share began because someone we love stopped coming to birthdays after a diabetes diagnosis. Our story, our mission, and the four values we bake by.",
+  alternates: { canonical: "/story" },
+  openGraph: {
+    title: "Our Story · Sweet Share",
+    description:
+      "It began because someone we love stopped coming to birthdays. Everything follows from that.",
+    url: "/story",
+  },
 };
 
 const VALUES = [

@@ -4,15 +4,24 @@ import Link from "next/link";
 import GalleryGrid from "@/components/GalleryGrid";
 import Reveal from "@/components/Reveal";
 import SparkleField from "@/components/SparkleField";
+import JsonLd from "@/components/JsonLd";
+import { itemListSchema, breadcrumbSchema } from "@/lib/seo";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "The Gallery",
+  title: "The Gallery — every dessert, with full nutrition",
   description:
-    "Every Sweet Share dessert, exhibited with its full ingredient list, nutrition and an honest note on blood sugar. Vegan, dairy-free, egg-free, no refined sugar.",
+    "Every Sweet Share dessert with its complete ingredient list, nutrition panel and net carbs. All vegan, dairy-free, egg-free and free of refined sugar. Filter by nut-free, gluten-free or gentlest on blood sugar.",
+  alternates: { canonical: "/gallery" },
+  openGraph: {
+    title: "The Gallery · Sweet Share",
+    description:
+      "Every dessert with full nutrition and net carbs. Vegan, dairy-free, egg-free, no refined sugar.",
+    url: "/gallery",
+  },
 };
 
 export default async function GalleryPage() {
@@ -28,6 +37,16 @@ export default async function GalleryPage() {
 
   return (
     <>
+      <JsonLd
+        data={[
+          itemListSchema(desserts, "/gallery", "The Sweet Share Gallery"),
+          breadcrumbSchema([
+            { name: "Home", path: "/" },
+            { name: "The Gallery", path: "/gallery" },
+          ]),
+        ]}
+      />
+
       <header className="light-shaft relative overflow-hidden pb-10 pt-20">
         <SparkleField count={20} />
         <div className="shell relative text-center">

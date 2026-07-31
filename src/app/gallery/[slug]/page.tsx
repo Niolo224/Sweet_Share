@@ -6,6 +6,8 @@ import AddToBasket from "@/components/AddToBasket";
 import Reveal from "@/components/Reveal";
 import SparkleField from "@/components/SparkleField";
 import TestimonialCard from "@/components/TestimonialCard";
+import JsonLd from "@/components/JsonLd";
+import { dessertSchema, breadcrumbSchema } from "@/lib/seo";
 import { prisma } from "@/lib/prisma";
 import {
   formatMoney,
@@ -24,13 +26,38 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const dessert = await prisma.dessert.findUnique({ where: { slug } });
   if (!dessert) return { title: "Not found" };
 
+  const net = netCarbs(
+    dessert.totalCarbsG,
+    dessert.fiberG,
+    dessert.sugarAlcoholG,
+  );
+
+  // Lead with the facts people search on, not adjectives.
+  const description = [
+    dessert.tagline + ".",
+    "Vegan, dairy-free, egg-free, no refined sugar.",
+    net != null ? `${net}g net carbs per serving.` : null,
+    `${formatMoney(dessert.priceCents)} — ${dessert.unitLabel}.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return {
     title: dessert.name,
-    description: dessert.tagline,
+    description,
+    alternates: { canonical: `/gallery/${dessert.slug}` },
     openGraph: {
+      type: "website",
       title: `${dessert.name} · Sweet Share`,
       description: dessert.description,
+      url: `/gallery/${dessert.slug}`,
       images: dessert.imageUrl ? [{ url: dessert.imageUrl }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${dessert.name} · Sweet Share`,
+      description,
+      images: dessert.imageUrl ? [dessert.imageUrl] : undefined,
     },
   };
 }
@@ -110,6 +137,17 @@ export default async function DessertPage({ params }: Params) {
 
   return (
     <>
+      <JsonLd
+        data={[
+          dessertSchema(dessert, dessert.reviews),
+          breadcrumbSchema([
+            { name: "Home", path: "/" },
+            { name: "The Gallery", path: "/gallery" },
+            { name: dessert.name, path: `/gallery/${dessert.slug}` },
+          ]),
+        ]}
+      />
+
       <nav className="shell pt-10 text-xs text-ink-faint">
         <Link href="/gallery" className="transition-colors hover:text-berry">
           The Gallery

@@ -3,11 +3,20 @@ import Link from "next/link";
 import Accordion, { type QA } from "@/components/Accordion";
 import Reveal from "@/components/Reveal";
 import SparkleField from "@/components/SparkleField";
+import JsonLd from "@/components/JsonLd";
+import { faqSchema, breadcrumbSchema } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Questions & Facts",
+  title: "Questions & Facts — vegan, diabetes-friendly baking explained",
   description:
-    "How Sweet Share bakes without dairy, eggs or refined sugar — and what the science actually says about allulose, monk fruit, dates and blood sugar.",
+    "How Sweet Share bakes without dairy, eggs or refined sugar, and what the evidence actually says about allulose, monk fruit, dates and blood sugar. Straight answers, including the awkward ones.",
+  alternates: { canonical: "/faq" },
+  openGraph: {
+    title: "Questions & Facts · Sweet Share",
+    description:
+      "Straight answers on allulose, monk fruit, dates and blood sugar — including the awkward ones.",
+    url: "/faq",
+  },
 };
 
 const FACTS = [
@@ -109,6 +118,18 @@ const HEART: QA[] = [
 export default function FaqPage() {
   return (
     <>
+      {/* Every question on the page, so an answer engine can quote one
+          directly rather than paraphrasing the whole article. */}
+      <JsonLd
+        data={[
+          faqSchema([...GENERAL, ...ORDERING, ...HEART]),
+          breadcrumbSchema([
+            { name: "Home", path: "/" },
+            { name: "Questions & Facts", path: "/faq" },
+          ]),
+        ]}
+      />
+
       <header className="light-shaft relative overflow-hidden pb-10 pt-20">
         <SparkleField count={18} />
         <div className="shell relative text-center">

@@ -8,9 +8,16 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Kind Words",
+  title: "Kind Words — reviews from our guests",
   description:
-    "What guests say about Sweet Share — reviews from people managing diabetes, feeding allergies, and just wanting something sweet.",
+    "What guests say about Sweet Share: reviews from people managing diabetes, feeding allergies, catering for churches, and just wanting something sweet. We publish the four-star ones too.",
+  alternates: { canonical: "/testimonials" },
+  openGraph: {
+    title: "Kind Words · Sweet Share",
+    description:
+      "Reviews from people managing diabetes, feeding allergies, and just wanting something sweet.",
+    url: "/testimonials",
+  },
 };
 
 export default async function TestimonialsPage() {

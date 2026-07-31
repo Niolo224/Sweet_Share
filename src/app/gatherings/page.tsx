@@ -4,6 +4,8 @@ import Reveal from "@/components/Reveal";
 import RsvpForm from "@/components/RsvpForm";
 import SparkleField from "@/components/SparkleField";
 import NewsletterForm from "@/components/NewsletterForm";
+import JsonLd from "@/components/JsonLd";
+import { eventSchema, breadcrumbSchema } from "@/lib/seo";
 import { prisma } from "@/lib/prisma";
 import { media, mediaAlt } from "@/lib/media";
 import { formatMoney } from "@/lib/utils";
@@ -11,9 +13,16 @@ import { formatMoney } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Gatherings",
+  title: "Gatherings — tastings, workshops and suppers",
   description:
-    "Tastings, sugar-free baking workshops and long-table suppers at Sweet Share. Most are free, and everyone is welcome.",
+    "Tastings, sugar-free baking workshops and long-table suppers at Sweet Share. Most are free, and everyone is welcome. RSVP online.",
+  alternates: { canonical: "/gatherings" },
+  openGraph: {
+    title: "Gatherings · Sweet Share",
+    description:
+      "Tastings, sugar-free baking workshops and long-table suppers. Most are free.",
+    url: "/gatherings",
+  },
 };
 
 function dateParts(date: Date) {
@@ -46,6 +55,16 @@ export default async function GatheringsPage() {
 
   return (
     <>
+      <JsonLd
+        data={[
+          ...upcoming.map((event) => eventSchema(event)),
+          breadcrumbSchema([
+            { name: "Home", path: "/" },
+            { name: "Gatherings", path: "/gatherings" },
+          ]),
+        ]}
+      />
+
       <header className="light-shaft relative overflow-hidden pb-10 pt-20">
         <SparkleField count={20} />
         <div className="shell relative text-center">

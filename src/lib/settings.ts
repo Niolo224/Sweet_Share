@@ -29,9 +29,33 @@ export const SETTING_DEFAULTS = {
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 
+/**
+ * Site copy, with the defaults above as a floor.
+ *
+ * This is called by the root layout, so it runs on literally every page —
+ * including the 404, which Next prerenders at build time. If it threw, an
+ * unreachable database would fail the build and, in production, take down
+ * every page rather than one.
+ *
+ * That is not hypothetical: Supabase pauses free projects after about a week
+ * of inactivity, and any host has the occasional connection blip. So a
+ * database that cannot be reached degrades to the built-in copy and the shop
+ * still renders. Dynamic pages that genuinely need data will still surface
+ * their own errors — this only protects the shell.
+ */
 export async function getSettings(): Promise<Record<SettingKey, string>> {
-  const rows = await prisma.siteSetting.findMany();
-  const stored = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  let stored: Record<string, string> = {};
+
+  try {
+    const rows = await prisma.siteSetting.findMany();
+    stored = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  } catch (error) {
+    console.error(
+      "[settings] Could not read site settings; falling back to defaults.",
+      error,
+    );
+  }
+
   return Object.fromEntries(
     Object.entries(SETTING_DEFAULTS).map(([key, fallback]) => [
       key,

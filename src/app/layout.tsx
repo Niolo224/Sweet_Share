@@ -3,10 +3,12 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { CartProvider } from "@/components/CartProvider";
+import JsonLd from "@/components/JsonLd";
 import { getSettings } from "@/lib/settings";
 import { media } from "@/lib/media";
+import { organisationSchema, SITE_URL } from "@/lib/seo";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const siteUrl = SITE_URL;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -40,7 +42,20 @@ export const metadata: Metadata = {
       "Vegan, diabetes-friendly desserts baked without dairy, eggs or refined sugar.",
     images: [media("hero")],
   },
-  robots: { index: true, follow: true },
+  alternates: { canonical: "/" },
+  applicationName: "Sweet Share",
+  category: "food",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
 };
 
 export default async function RootLayout({
@@ -71,23 +86,7 @@ export default async function RootLayout({
           />
         </CartProvider>
 
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Bakery",
-              name: "Sweet Share",
-              description:
-                "Vegan, diabetes-friendly desserts baked without dairy, eggs or refined sugar.",
-              url: siteUrl,
-              image: media("hero"),
-              email: settings.contactEmail,
-              servesCuisine: ["Vegan", "Desserts", "Plant-based"],
-              priceRange: "$$",
-            }),
-          }}
-        />
+        <JsonLd data={organisationSchema(settings.contactEmail)} />
       </body>
     </html>
   );
