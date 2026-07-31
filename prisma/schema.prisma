@@ -404,6 +404,60 @@ model Message {
   @@index([isRead])
 }
 
+/// A guest's standing at the table, keyed by email.
+///
+/// There are deliberately no customer accounts on this site — checkout is
+/// guest-only and works well that way. Loyalty therefore attaches to the email
+/// address someone already gives us, and needs no password, no signup and no
+/// extra step at checkout.
+model LoyaltyAccount {
+  id    String @id @default(cuid())
+  email String @unique
+  name  String?
+
+  /// Spendable now.
+  points         Int @default(0)
+  /// Never decreases — what tier is calculated from.
+  lifetimePoints Int @default(0)
+
+  /// neighbour | friend | family
+  tier String @default("neighbour")
+
+  /// Rewards minted so far, for the admin's benefit.
+  rewardsIssued Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events LoyaltyEvent[]
+
+  @@index([tier])
+}
+
+/// Every point in and out, so a balance can always be explained.
+model LoyaltyEvent {
+  id        String @id @default(cuid())
+  accountId String
+
+  /// Positive to earn, negative to spend or claw back.
+  points Int
+  /// order | review | club_bonus | reward | refund | manual
+  reason String
+  note   String?
+
+  orderId     String?
+  orderNumber String?
+  giftCardId  String?
+
+  createdAt DateTime @default(now())
+
+  account LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  /// One earn event per order, whatever replays.
+  @@unique([orderId, reason])
+}
+
 /// Editable site copy — hero lines, mission, announcement bar.
 /// Keeps the owner out of the codebase.
 model SiteSetting {

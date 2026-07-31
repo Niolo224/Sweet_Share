@@ -17,6 +17,7 @@ const COLUMNS = [
     heading: "Know us",
     links: [
       { href: "/story", label: "Our story" },
+      { href: "/rewards", label: "The Table — rewards" },
       { href: "/gift-cards", label: "Gift cards" },
       { href: "/testimonials", label: "Kind words" },
       { href: "/faq", label: "Questions & facts" },

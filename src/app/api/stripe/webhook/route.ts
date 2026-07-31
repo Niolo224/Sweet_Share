@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getStripe } from "@/lib/stripe";
 import { sendEmail, emailShell } from "@/lib/email";
 import { raiseDueBoxes, startBoxClock } from "@/lib/club";
+import { awardForOrder, clawBack, progress } from "@/lib/loyalty";
 import { formatMoney, formatDate } from "@/lib/utils";
 
 /**
@@ -77,6 +78,19 @@ async function markOrderPaid(orderId: string) {
     },
   });
 
+  // Points are earned the moment the money is real, not when it is promised.
+  const account = await awardForOrder(orderId);
+  const loyaltyLine = account
+    ? `<p style="margin-top:18px;padding:14px 16px;background:#ffe6ee;border-radius:12px;">
+         You now have <strong>${account.points} points</strong> at our table.
+         ${
+           progress(account.points).remaining > 0
+             ? `${progress(account.points).remaining} more and we send you $10 to spend.`
+             : ""
+         }
+       </p>`
+    : "";
+
   await sendEmail({
     to: order.email,
     subject: `Payment received — order ${order.orderNumber}`,
@@ -87,6 +101,7 @@ async function markOrderPaid(orderId: string) {
        ${order.fulfillment === "delivery" ? "Delivery" : "Collection"} on
        ${formatDate(order.requestedDate)}${order.timeWindow ? `, ${order.timeWindow}` : ""}<br/>
        Total paid: ${formatMoney(order.totalCents)}</p>
+       ${loyaltyLine}
        <p>We bake on the morning of your date, never before. If anything
        changes, simply reply to this email.</p>`,
     ),
@@ -320,6 +335,11 @@ export async function POST(request: Request) {
             where: { orderNumber: refundedOrderNumber },
             data: { paymentStatus: "refunded" },
           });
+          // Points followed the money in; they follow it back out.
+          const refunded = await prisma.order.findUnique({
+            where: { orderNumber: refundedOrderNumber },
+          });
+          if (refunded) await clawBack(refunded.id);
         }
 
         // A refunded gift card must stop being spendable.

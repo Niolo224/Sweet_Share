@@ -2,6 +2,7 @@ import type { Subscription } from "@prisma/client";
 import { prisma } from "./prisma";
 import { sendEmail, emailShell } from "./email";
 import { findPlan, CLUB_LEAD_TIME_DAYS } from "./plans";
+import { awardForOrder } from "./loyalty";
 import { formatDate, orderNumber } from "./utils";
 
 /**
@@ -127,6 +128,14 @@ async function raiseOne(subscription: Subscription): Promise<boolean> {
     where: { id: subscription.id },
     data: { nextBoxAt: addOneMonth(due) },
   });
+
+  // Club boxes are already paid for, so they earn on arrival — at the double
+  // rate members get, which is much of the point of joining.
+  const raised = await prisma.order.findFirst({
+    where: { clubBoxKey: boxKey },
+    select: { id: true },
+  });
+  if (raised) await awardForOrder(raised.id);
 
   await sendEmail({
     to: subscription.email,

@@ -15,6 +15,7 @@ import {
   MIN_GIFT_CENTS,
   MAX_GIFT_CENTS,
 } from "@/lib/giftcards";
+import { award, clawBack, POINTS_PER_REVIEW } from "@/lib/loyalty";
 
 export type ActionState = { error?: string; success?: string } | null;
 
@@ -383,7 +384,28 @@ export async function setReviewStatusAction(form: FormData) {
   if (!id || !status) return;
   if (!["pending", "approved", "rejected"].includes(status)) return;
 
-  await prisma.review.update({ where: { id }, data: { status } });
+  const review = await prisma.review.update({ where: { id }, data: { status } });
+
+  /**
+   * A published review earns points — for taking the trouble, not for being
+   * flattering. Guarded on the review id so re-approving pays nothing extra,
+   * and four-star reviews earn exactly the same as five-star ones.
+   */
+  if (status === "approved" && review.email) {
+    const already = await prisma.loyaltyEvent.findFirst({
+      where: { reason: "review", note: { contains: review.id } },
+    });
+    if (!already) {
+      await award({
+        email: review.email,
+        name: review.name,
+        points: POINTS_PER_REVIEW,
+        reason: "review",
+        note: `Review ${review.id}`,
+      });
+    }
+  }
+
   revalidatePath("/admin/reviews");
   revalidatePath("/testimonials");
   revalidatePath("/");
@@ -440,8 +462,11 @@ export async function setOrderStatusAction(form: FormData) {
 
   await prisma.order.update({ where: { id }, data: { status } });
 
-  // Cancelling an order hands any gift card value back to the guest.
-  if (status === "cancelled") await refundToCard(id);
+  // Cancelling hands back any gift card value, and takes the points with it.
+  if (status === "cancelled") {
+    await refundToCard(id);
+    await clawBack(id);
+  }
 
   revalidatePath("/admin/orders");
   revalidatePath("/admin/gift-cards");
@@ -712,6 +737,47 @@ export async function restoreGiftCardAction(form: FormData) {
     data: { status: card.balanceCents > 0 ? "active" : "spent" },
   });
   revalidatePath("/admin/gift-cards");
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Loyalty
+// ═══════════════════════════════════════════════════════════
+
+/** Add or remove points by hand — an apology, a correction, a thank-you. */
+export async function adjustPointsAction(
+  _prev: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const email = text(form, "email");
+  const points = num(form, "points");
+  const note = text(form, "note");
+
+  if (!email) return { error: "Which email?" };
+  if (points == null || points === 0) {
+    return { error: "How many points? Use a negative number to take some away." };
+  }
+  if (Math.abs(points) > 5000) {
+    return { error: "That is a very large adjustment. Keep it under 5,000." };
+  }
+
+  try {
+    await award({
+      email,
+      points: Math.round(points),
+      reason: "manual",
+      note: note ?? "Adjusted by the kitchen",
+    });
+  } catch (error) {
+    console.error("[admin/adjustPoints]", error);
+    return { error: "Could not adjust that account." };
+  }
+
+  revalidatePath("/admin/loyalty");
+  return {
+    success: `${points > 0 ? "Added" : "Removed"} ${Math.abs(Math.round(points))} points.`,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════

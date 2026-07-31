@@ -60,6 +60,7 @@ the server log instead of sending.
 | `/testimonials` | All approved reviews, rating distribution, and a form to leave one |
 | `/club` | The Sweet Share Club — three box tiers, billed monthly or yearly (twelve boxes for eleven months' price) |
 | `/gift-cards` | Buy a gift card, sent straight to the recipient with a note |
+| `/rewards` | The Table — loyalty with no signup, no card and no app |
 | `/order` | Advance-order basket with lead-time enforcement, gift card redemption, pickup or delivery, allergy notes |
 | `/faq` | Questions and facts, including the honest ones about sugar |
 | `/contact` | Catering, wholesale, custom orders, prayer requests |
@@ -73,6 +74,8 @@ the server log instead of sending.
   one-click cancellation
 - **Gift cards** — every card, its balance and full movement history, your
   unredeemed liability, plus issuing comped cards by hand
+- **The Table** — loyalty balances, tiers, future liability, the full points
+  ledger, and manual adjustments
 - **Desserts** — add and edit desserts, upload photos, write ingredients and
   full nutrition, feature them, rest them for a season
 - **Menus** — build seasonal menus from your desserts, upload a printed PDF,
@@ -182,3 +185,44 @@ customers are making real decisions from these numbers.
 ---
 
 *“Do not neglect to do good and to share what you have.”* — Hebrews 13:16
+
+---
+
+## Loyalty — The Table
+
+There are no customer accounts on this site, and adding them to support loyalty
+would have damaged a guest checkout that works. So points attach to the email
+address someone already gives at checkout: nothing to join, no card, no app.
+
+A reward is not a second kind of balance. When someone crosses the threshold, a
+**gift card is minted and emailed automatically** — redemption then runs through
+the path that is already built and already safe under concurrency, rather than a
+parallel one with its own races to get wrong.
+
+The economics live in one file, `src/lib/loyalty.ts`:
+
+| Dial | Default | Meaning |
+|---|---|---|
+| `POINTS_PER_DOLLAR` | 1 | Earned on money actually paid |
+| `REWARD_THRESHOLD` | 200 | Points needed for a reward |
+| `REWARD_VALUE_CENTS` | 1000 | What the reward is worth |
+| `CLUB_MULTIPLIER` | 2 | Club members earn double |
+| `POINTS_PER_REVIEW` | 25 | For a published review, whatever its rating |
+
+That works out to roughly **5% back** — generous for food without being
+ruinous; typical programmes run 3–5%. Change the numbers and new earning
+follows immediately; points already banked are unaffected.
+
+Three deliberate choices worth keeping:
+
+- **Points are earned on money paid, not order value.** A gift-card-covered
+  order earns nothing, so a reward cannot fund the points that mint another.
+- **Rewards are issued automatically.** Asking people to remember to redeem is
+  how loyalty schemes become unclaimed liability and mild resentment.
+- **Balances are emailed, never displayed.** Anyone could otherwise type an
+  address and read a stranger's history, so the lookup replies identically
+  whether or not the account exists.
+
+Cancelling an order takes the points back, but never below zero — a reward
+already sent is theirs. The admin ledger records what was actually taken and
+notes any difference, so the history always reconciles with the balance.
