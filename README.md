@@ -157,6 +157,7 @@ npm run setup            # db push + seed, from scratch
 npm run db:seed          # re-seed (safe to run repeatedly)
 npm run db:studio        # browse the database in a GUI
 npm run media:download   # pull brand imagery into public/images
+npm run preflight        # is this thing ready to take real orders?
 ```
 
 ---

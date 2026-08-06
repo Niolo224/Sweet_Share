@@ -1,9 +1,42 @@
 # Getting Sweet Share online
 
-From nothing to `sweetshare.shop`, in order. Budget about half an hour.
+## Start here
 
-Nothing here is reversible-scary — you can do steps 1 and 2 today and leave the
-rest until you are ready to take money.
+Work top to bottom. After each step run:
+
+```bash
+npm run preflight
+```
+
+It checks the things that fail *silently* — a shop that looks perfectly healthy
+while no customer receives an email, or members are billed and no box reaches
+the kitchen. It reads only; it never writes or charges anything. Green
+throughout means you can take a real order.
+
+**Secrets are already generated.** `ADMIN_PASSWORD`, `SESSION_SECRET` and
+`CRON_SECRET` were written into `.env` for you. Read them back when you need
+them for Vercel:
+
+```bash
+grep -E "^(ADMIN_PASSWORD|SESSION_SECRET|CRON_SECRET)=" .env
+```
+
+### The order
+
+| # | Do this | Where | Why it matters |
+|---|---|---|---|
+| 1 | Rotate the database password and the Resend key | Supabase → Settings → Database · Resend → API Keys | Both were shared in plain text |
+| 2 | Paste the **pooled** connection string into `DATABASE_URL` | Supabase → Connect → ORMs → Prisma | Only the region is missing |
+| 3 | `npx prisma db push && npm run db:seed` | terminal | Creates and fills the tables |
+| 4 | Verify `sweetshare.shop` | Resend → Domains | **Until this, customers receive nothing at all** |
+| 5 | Finish account activation | Stripe → the orange banner | No real payment works until it clears |
+| 6 | Deploy, and add every variable | Vercel | See the table below |
+| 7 | Add the webhook + its nine events | Stripe → Developers → Webhooks | Preflight names any you miss |
+| 8 | Point the domain | Vercel → Settings → Domains | |
+| 9 | `npm run media:download`, set `NEXT_PUBLIC_LOCAL_MEDIA=1` | terminal | Images onto your own domain |
+| 10 | One real order: place, pay, refund | your own site | The only test I could never run |
+
+Steps 1–4 are worth doing today. Nothing after step 3 is reversible-scary.
 
 ---
 

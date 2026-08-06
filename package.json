@@ -2,7 +2,7 @@
   "name": "sweet-share",
   "version": "1.0.0",
   "private": true,
-  "description": "Sweet Share — a plant-based, diabetes-friendly dessert house. Every sweet shared is a seed of joy.",
+  "description": "Sweet Share \u2014 a plant-based, diabetes-friendly dessert house. Every sweet shared is a seed of joy.",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
@@ -12,7 +12,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "media:download": "node scripts/download-media.mjs",
-    "setup": "prisma db push && tsx prisma/seed.ts"
+    "setup": "prisma db push && tsx prisma/seed.ts",
+    "preflight": "tsx scripts/preflight.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
