@@ -207,7 +207,7 @@ The economics live in one file, `src/lib/loyalty.ts`:
 | `REWARD_THRESHOLD` | 200 | Points needed for a reward |
 | `REWARD_VALUE_CENTS` | 1000 | What the reward is worth |
 | `CLUB_MULTIPLIER` | 2 | Club members earn double |
-| `POINTS_PER_REVIEW` | 25 | For a published review, whatever its rating |
+| `POINTS_PER_REVIEW` | 10 | For a published review, whatever its rating |
 
 That works out to roughly **5% back** — generous for food without being
 ruinous; typical programmes run 3–5%. Change the numbers and new earning

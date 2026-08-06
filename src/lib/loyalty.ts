@@ -35,8 +35,13 @@ export const CLUB_MULTIPLIER = 2;
 export const REWARD_THRESHOLD = 200;
 export const REWARD_VALUE_CENTS = 1000;
 
-/** A small thank-you for a published review. Not for writing a nice one. */
-export const POINTS_PER_REVIEW = 25;
+/**
+ * A small thank-you for a published review. Not for writing a nice one.
+ *
+ * Kept deliberately low relative to the ~200 points an average order earns: a
+ * review incentive that competes with buying is buying words, not goodwill.
+ */
+export const POINTS_PER_REVIEW = 10;
 
 export const TIERS = [
   {
